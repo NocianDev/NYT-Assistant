@@ -41,7 +41,7 @@ function HomePage() {
         title="HoyMismo Assistant 🤖"
         welcomeMessage="Hola 👋 ¿En qué puedo ayudarte hoy?"
         primaryColor="#facc15"
-        apiUrl="http://localhost:3000/chat"
+        apiUrl={`${import.meta.env.VITE_API_URL}/chat`}
       />
     </div>
   );

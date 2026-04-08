@@ -23,7 +23,7 @@ export default function LeadsPanel() {
     setError("");
 
     try {
-      const res = await axios.get("http://localhost:3000/leads", {
+      const res = await axios.get(`${import.meta.env.VITE_API_URL}/leads`, {
         headers: {
           "x-admin-password": password,
         },
@@ -41,7 +41,7 @@ export default function LeadsPanel() {
 
   async function deleteLead(id: string) {
     try {
-      await axios.delete(`http://localhost:3000/leads/${id}`, {
+      await axios.delete(`${import.meta.env.VITE_API_URL}/leads/${id}`, {
         headers: {
           "x-admin-password": password,
         },
