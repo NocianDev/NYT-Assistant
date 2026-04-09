@@ -9,25 +9,33 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const ALLOWED_ORIGINS = [
+const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
+  "https://hoy-mismo-assitant.vercel.app",
+  "https://hoymismo-assitant.vercel.app",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      if (ALLOWED_ORIGINS.includes(origin)) {
+      if (allowedOrigins.includes(origin)) {
         return callback(null, true);
       }
 
-      return callback(new Error("No permitido por CORS"));
+      console.log("Origen bloqueado por CORS:", origin);
+      return callback(new Error(`CORS bloqueado para: ${origin}`));
     },
+    methods: ["GET", "POST", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "x-admin-password"],
+    credentials: false,
   })
 );
+
+app.options("*", cors());
 
 app.use(express.json());
 
@@ -185,11 +193,6 @@ Reglas:
 - si ya te dieron nombre o teléfono, sigue guiando la conversación
 - evita respuestas largas
 - busca llevar la conversación a una cotización
-
-Ejemplos:
-- "Claro 👌 te puedo ayudar con eso. ¿Buscas algo informativo o una solución más completa?"
-- "Sí, manejamos ese tipo de proyectos. Para orientarte mejor, ¿me compartes tu nombre y tu WhatsApp?"
-- "Perfecto, gracias. Ahora cuéntame un poco qué necesitas y te ayudo a aterrizarlo."
 `;
 
 app.post("/chat", async (req, res) => {
