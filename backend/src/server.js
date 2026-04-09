@@ -8,8 +8,12 @@ import Tenant from "./models/Tenant.js";
 
 dotenv.config();
 
+console.log("MONGODB_URI existe:", !!process.env.MONGODB_URI);
+
 mongoose
-  .connect(process.env.MONGODB_URI)
+  .connect(process.env.MONGODB_URI, {
+    serverSelectionTimeoutMS: 10000,
+  })
   .then(() => console.log("Mongo conectado"))
   .catch((err) => console.error("Error conectando Mongo:", err));
 
