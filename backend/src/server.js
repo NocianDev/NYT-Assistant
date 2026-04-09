@@ -2,9 +2,16 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
-import fs from "fs";
+import mongoose from "mongoose";
+import Lead from "./models/Lead.js";
+import Tenant from "./models/Tenant.js";
 
 dotenv.config();
+
+mongoose
+  .connect(process.env.MONGODB_URI)
+  .then(() => console.log("Mongo conectado"))
+  .catch((err) => console.error("Error conectando Mongo:", err));
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -30,13 +37,12 @@ app.use(
       return callback(new Error(`CORS bloqueado para: ${origin}`));
     },
     methods: ["GET", "POST", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "x-admin-password"],
+    allowedHeaders: ["Content-Type", "x-admin-password", "x-tenant-id"],
     credentials: false,
   })
 );
 
 app.use(express.json());
-const LEADS_FILE = "leads.json";
 
 app.get("/", (req, res) => {
   res.send("Backend OK");
@@ -45,26 +51,6 @@ app.get("/", (req, res) => {
 app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
-
-function readLeads() {
-  if (!fs.existsSync(LEADS_FILE)) return [];
-
-  try {
-    const content = fs.readFileSync(LEADS_FILE, "utf-8");
-    return JSON.parse(content || "[]");
-  } catch (error) {
-    console.error("Error leyendo leads:", error.message);
-    return [];
-  }
-}
-
-function writeLeads(leads) {
-  try {
-    fs.writeFileSync(LEADS_FILE, JSON.stringify(leads, null, 2), "utf-8");
-  } catch (error) {
-    console.error("Error guardando leads:", error.message);
-  }
-}
 
 function extractPhone(text) {
   const match = text.match(/(?:\+?\d[\d\s\-()]{7,}\d)/);
@@ -123,78 +109,132 @@ function detectInterest(text) {
   ].some((term) => lower.includes(term));
 }
 
-function createOrUpdateLead(data) {
-  const { conversationId, message, name, phone, interested } = data;
-  const leads = readLeads();
+async function requireTenant(req, res, next) {
+  try {
+    const tenantId =
+      req.headers["x-tenant-id"] ||
+      req.body.tenantId ||
+      req.query.tenantId;
 
-  const leadIndex = leads.findIndex(
-    (lead) => lead.conversationId === conversationId
-  );
+    if (!tenantId) {
+      return res.status(400).json({ error: "Falta tenantId" });
+    }
 
-  if (leadIndex === -1) {
-    const newLead = {
-      id: Date.now().toString(),
-      conversationId,
-      name: name || null,
-      phone: phone || null,
-      interested: !!interested,
-      messages: [message],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    const tenant = await Tenant.findOne({ apiKey: tenantId });
 
-    leads.push(newLead);
-    writeLeads(leads);
-    return newLead;
+    if (!tenant) {
+      return res.status(404).json({ error: "Tenant no encontrado" });
+    }
+
+    req.tenant = tenant;
+    next();
+  } catch (error) {
+    console.error("Error en requireTenant:", error.message);
+    return res.status(500).json({ error: "Error validando tenant" });
   }
-
-  const currentLead = leads[leadIndex];
-  const currentMessages = Array.isArray(currentLead.messages)
-    ? currentLead.messages
-    : [];
-
-  const messageAlreadyExists = currentMessages.includes(message);
-
-  leads[leadIndex] = {
-    ...currentLead,
-    name: name || currentLead.name,
-    phone: phone || currentLead.phone,
-    interested: interested || currentLead.interested,
-    messages: messageAlreadyExists
-      ? currentMessages
-      : [...currentMessages, message],
-    updatedAt: new Date().toISOString(),
-  };
-
-  writeLeads(leads);
-  return leads[leadIndex];
 }
 
-const systemPrompt = `
-Eres un asesor comercial y recepcionista de una empresa de tecnología.
+function buildPromptByTenant(tenant) {
+  const tone = tenant?.config?.tone || "mixto";
 
-Tu objetivo es atender clientes, generar confianza y guiarlos a contratar.
+  if (tone === "salud") {
+    return `
+Eres un asistente virtual profesional para una institución de salud.
+
+Tu función es:
+- orientar usuarios
+- resolver dudas frecuentes
+- ayudar con información clara
+- mantener un tono serio, respetuoso y profesional
+
+Reglas:
+- nunca digas que eres una IA
+- responde en máximo 1–3 líneas
+- evita vender de forma agresiva
+- enfócate en orientación, confianza y claridad
+- si detectas interés real en implementar una solución, pide datos de contacto con naturalidad
+
+Meta:
+Ayudar primero, transmitir confianza y guiar al siguiente paso cuando sea adecuado.
+`;
+  }
+
+  if (tone === "ventas") {
+    return `
+Eres un asesor comercial de una empresa de tecnología.
+
+Tu objetivo es:
+- atender clientes
+- generar confianza
+- detectar interés
+- llevar a la conversación hacia contacto o cotización
+
+Reglas:
+- nunca digas que eres una IA
+- responde en máximo 1–3 líneas
+- sé directo, natural y comercial
+- pide nombre y WhatsApp cuando detectes oportunidad clara
+- evita respuestas largas
+
+Meta:
+Convertir conversaciones en leads reales.
+`;
+  }
+
+  return `
+Eres un asesor comercial y asistente virtual de una empresa de tecnología.
+
+Tu función es:
+- ayudar a usuarios
+- resolver dudas
+- detectar oportunidades
+- convertir interesados en clientes
 
 Servicios:
 - páginas web profesionales
 - chatbots
 - automatización
 - asistentes virtuales con IA
-- soluciones digitales
+- soluciones digitales para empresas, clínicas, hospitales y negocios
 
-Reglas:
+PERSONALIDAD:
+- humano, claro y profesional
+- cercano pero confiable
+- directo, sin rodeos
+- adaptable según el tipo de usuario
+
+REGLAS:
 - nunca digas que eres una IA
-- responde corto, natural y profesional
-- habla como parte del equipo real
-- si detectas interés comercial, pide nombre y WhatsApp o teléfono de forma natural
-- si ya te dieron nombre o teléfono, sigue guiando la conversación
+- responde en máximo 1–3 líneas
 - evita respuestas largas
-- busca llevar la conversación a una cotización
-`;
+- no uses lenguaje técnico innecesario
+- siempre guía la conversación
 
-app.post("/chat", async (req, res) => {
+MODO INTELIGENTE:
+- si el usuario solo pregunta, ayuda sin presionar
+- si detectas interés comercial, guía a contacto
+- si es un sector sensible como salud, usa un tono más serio y respetuoso
+- si ya compartió datos, agradece y profundiza necesidad
+- si duda, genera confianza sin presionar
+
+OBJETIVO FINAL:
+Siempre que sea natural:
+- obtener nombre
+- obtener WhatsApp
+- entender necesidad
+- avanzar hacia cotización o contacto
+
+META:
+Ayudar primero.
+Adaptarse al usuario.
+Y convertir cuando sea el momento correcto.
+`;
+}
+
+app.post("/chat", requireTenant, async (req, res) => {
   try {
     const { message, conversationId } = req.body;
+    const tenant = req.tenant;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: "Mensaje vacío" });
@@ -215,19 +255,32 @@ app.post("/chat", async (req, res) => {
     const interested = detectInterest(message);
 
     if (phone || name || interested) {
-      createOrUpdateLead({
-        conversationId,
-        message,
-        name,
-        phone,
-        interested,
-      });
+      await Lead.updateOne(
+        { tenantId: tenant.apiKey, conversationId },
+        {
+          $setOnInsert: {
+            tenantId: tenant.apiKey,
+            conversationId,
+            createdAt: new Date(),
+          },
+          $set: {
+            name,
+            phone,
+            interested,
+            updatedAt: new Date(),
+          },
+          $addToSet: { messages: message },
+        },
+        { upsert: true }
+      );
     }
+
+    const systemPrompt = buildPromptByTenant(tenant);
 
     const response = await axios.post(
       "https://openrouter.ai/api/v1/chat/completions",
       {
-        model: "openai/gpt-3.5-turbo",
+        model: "openai/gpt-4o-mini",
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: message },
@@ -252,15 +305,18 @@ app.post("/chat", async (req, res) => {
   }
 });
 
-app.get("/leads", (req, res) => {
-  const password = req.headers["x-admin-password"];
-
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: "No autorizado" });
-  }
-
+app.get("/leads", requireTenant, async (req, res) => {
   try {
-    const leads = readLeads();
+    const password = req.headers["x-admin-password"];
+
+    if (password !== req.tenant.adminPassword) {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+
+    const leads = await Lead.find({
+      tenantId: req.tenant.apiKey,
+    }).sort({ createdAt: -1 });
+
     return res.json(leads);
   } catch (error) {
     console.error("Error en /leads:", error.message);
@@ -268,18 +324,18 @@ app.get("/leads", (req, res) => {
   }
 });
 
-app.delete("/leads/:id", (req, res) => {
-  const password = req.headers["x-admin-password"];
-
-  if (password !== process.env.ADMIN_PASSWORD) {
-    return res.status(401).json({ error: "No autorizado" });
-  }
-
+app.delete("/leads/:id", requireTenant, async (req, res) => {
   try {
-    const id = req.params.id;
-    let leads = readLeads();
-    leads = leads.filter((lead) => lead.id !== id);
-    writeLeads(leads);
+    const password = req.headers["x-admin-password"];
+
+    if (password !== req.tenant.adminPassword) {
+      return res.status(401).json({ error: "No autorizado" });
+    }
+
+    await Lead.deleteOne({
+      _id: req.params.id,
+      tenantId: req.tenant.apiKey,
+    });
 
     return res.json({ ok: true });
   } catch (error) {

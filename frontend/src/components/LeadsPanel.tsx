@@ -2,7 +2,9 @@ import { useState } from "react";
 import axios from "axios";
 
 type Lead = {
-  id: string;
+  _id: string;
+  tenantId: string;
+  conversationId: string;
   name: string | null;
   phone: string | null;
   interested: boolean;
@@ -13,6 +15,8 @@ type Lead = {
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
+
+const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 
 export default function LeadsPanel() {
   const [password, setPassword] = useState("");
@@ -29,13 +33,18 @@ export default function LeadsPanel() {
       const res = await axios.get(`${API_URL}/leads`, {
         headers: {
           "x-admin-password": password,
+          "x-tenant-id": TENANT_ID,
         },
       });
 
       setLeads(res.data);
       setAuthorized(true);
-    } catch {
-      setError("Contraseña incorrecta o no se pudieron cargar los leads.");
+    } catch (err: any) {
+      console.error(err?.response?.data || err.message);
+      setError(
+        err?.response?.data?.error ||
+          "Contraseña incorrecta o no se pudieron cargar los leads."
+      );
       setAuthorized(false);
     } finally {
       setLoading(false);
@@ -47,12 +56,14 @@ export default function LeadsPanel() {
       await axios.delete(`${API_URL}/leads/${id}`, {
         headers: {
           "x-admin-password": password,
+          "x-tenant-id": TENANT_ID,
         },
       });
 
-      loadLeads();
-    } catch {
-      alert("Error al eliminar lead");
+      setLeads((prev) => prev.filter((lead) => lead._id !== id));
+    } catch (err: any) {
+      console.error(err?.response?.data || err.message);
+      alert(err?.response?.data?.error || "Error al eliminar lead");
     }
   }
 
@@ -110,8 +121,8 @@ export default function LeadsPanel() {
           </h2>
 
           <p style={{ color: "#64748b", lineHeight: 1.7 }}>
-            Ingresa la contraseña de administrador para ver, actualizar y
-            eliminar leads capturados por el asistente.
+            Ingresa la contraseña de administrador para ver y gestionar los
+            leads de este tenant.
           </p>
 
           <input
@@ -249,95 +260,96 @@ export default function LeadsPanel() {
               No hay leads aún.
             </div>
           ) : (
-            leads
-              .slice()
-              .reverse()
-              .map((lead) => (
+            leads.map((lead) => (
+              <div
+                key={lead._id}
+                style={{
+                  background: "#ffffff",
+                  borderRadius: "20px",
+                  padding: "22px",
+                  border: "1px solid rgba(15, 23, 42, 0.08)",
+                  boxShadow: "0 14px 32px rgba(15, 23, 42, 0.06)",
+                }}
+              >
                 <div
-                  key={lead.id}
                   style={{
-                    background: "#ffffff",
-                    borderRadius: "20px",
-                    padding: "22px",
-                    border: "1px solid rgba(15, 23, 42, 0.08)",
-                    boxShadow: "0 14px 32px rgba(15, 23, 42, 0.06)",
+                    display: "grid",
+                    gap: "12px",
+                    marginBottom: "14px",
                   }}
                 >
-                  <div
-                    style={{
-                      display: "grid",
-                      gap: "12px",
-                      marginBottom: "14px",
-                    }}
-                  >
-                    <div>
-                      <strong>Nombre:</strong> {lead.name || "Sin nombre"}
-                    </div>
+                  <div>
+                    <strong>Nombre:</strong> {lead.name || "Sin nombre"}
+                  </div>
 
-                    <div>
-                      <strong>Teléfono:</strong> {lead.phone || "Sin teléfono"}
-                    </div>
+                  <div>
+                    <strong>Teléfono:</strong> {lead.phone || "Sin teléfono"}
+                  </div>
 
-                    <div>
-                      <strong>Interesado:</strong>{" "}
-                      <span
+                  <div>
+                    <strong>Interesado:</strong>{" "}
+                    <span
+                      style={{
+                        color: lead.interested ? "#16a34a" : "#dc2626",
+                        fontWeight: 700,
+                      }}
+                    >
+                      {lead.interested ? "Sí" : "No"}
+                    </span>
+                  </div>
+
+                  <div>
+                    <strong>Conversation ID:</strong> {lead.conversationId}
+                  </div>
+
+                  <div>
+                    <strong>Creado:</strong>{" "}
+                    {new Date(lead.createdAt).toLocaleString()}
+                  </div>
+
+                  <div>
+                    <strong>Actualizado:</strong>{" "}
+                    {new Date(lead.updatedAt).toLocaleString()}
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "12px" }}>
+                  <strong>Mensajes:</strong>
+                  <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
+                    {lead.messages.map((msg, i) => (
+                      <div
+                        key={i}
                         style={{
-                          color: lead.interested ? "#16a34a" : "#dc2626",
-                          fontWeight: 700,
+                          background: "#f8fafc",
+                          border: "1px solid rgba(15, 23, 42, 0.06)",
+                          padding: "10px 12px",
+                          borderRadius: "12px",
+                          color: "#334155",
                         }}
                       >
-                        {lead.interested ? "Sí" : "No"}
-                      </span>
-                    </div>
-
-                    <div>
-                      <strong>Creado:</strong>{" "}
-                      {new Date(lead.createdAt).toLocaleString()}
-                    </div>
-
-                    <div>
-                      <strong>Actualizado:</strong>{" "}
-                      {new Date(lead.updatedAt).toLocaleString()}
-                    </div>
+                        {msg}
+                      </div>
+                    ))}
                   </div>
-
-                  <div style={{ marginBottom: "12px" }}>
-                    <strong>Mensajes:</strong>
-                    <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
-                      {lead.messages.map((msg, i) => (
-                        <div
-                          key={i}
-                          style={{
-                            background: "#f8fafc",
-                            border: "1px solid rgba(15, 23, 42, 0.06)",
-                            padding: "10px 12px",
-                            borderRadius: "12px",
-                            color: "#334155",
-                          }}
-                        >
-                          {msg}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => deleteLead(lead.id)}
-                    style={{
-                      marginTop: "10px",
-                      padding: "11px 14px",
-                      borderRadius: "12px",
-                      border: "none",
-                      background: "#ef4444",
-                      color: "white",
-                      cursor: "pointer",
-                      fontWeight: 700,
-                    }}
-                  >
-                    Eliminar lead
-                  </button>
                 </div>
-              ))
+
+                <button
+                  onClick={() => deleteLead(lead._id)}
+                  style={{
+                    marginTop: "10px",
+                    padding: "11px 14px",
+                    borderRadius: "12px",
+                    border: "none",
+                    background: "#ef4444",
+                    color: "white",
+                    cursor: "pointer",
+                    fontWeight: 700,
+                  }}
+                >
+                  Eliminar lead
+                </button>
+              </div>
+            ))
           )}
         </div>
       </div>
