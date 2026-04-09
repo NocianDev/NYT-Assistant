@@ -35,10 +35,7 @@ app.use(
   })
 );
 
-app.options("*", cors());
-
 app.use(express.json());
-
 const LEADS_FILE = "leads.json";
 
 app.get("/", (req, res) => {
