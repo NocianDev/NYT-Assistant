@@ -1,11 +1,12 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { useEffect, useState } from "react";
 import AssistantWidget from "./components/AssistantWidget";
 import LeadsPanel from "./components/LeadsPanel";
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
 
-const sectionTitleStyle: React.CSSProperties = {
+const sectionTitleStyle = {
   fontSize: "clamp(28px, 4vw, 42px)",
   lineHeight: 1.1,
   margin: 0,
@@ -14,14 +15,14 @@ const sectionTitleStyle: React.CSSProperties = {
   letterSpacing: "-0.03em",
 };
 
-const sectionTextStyle: React.CSSProperties = {
+const sectionTextStyle = {
   color: "#64748b",
   fontSize: "17px",
   lineHeight: 1.8,
   margin: 0,
 };
 
-const cardStyle: React.CSSProperties = {
+const cardStyle = {
   background: "#ffffff",
   border: "1px solid rgba(15, 23, 42, 0.08)",
   borderRadius: "24px",
@@ -145,6 +146,16 @@ function UseCaseCard({
 }
 
 function HomePage() {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 900 : false
+  );
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 900);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   return (
     <div
       style={{
@@ -159,7 +170,7 @@ function HomePage() {
         style={{
           maxWidth: "1180px",
           margin: "0 auto",
-          padding: "32px 20px 120px",
+          padding: isMobile ? "24px 16px 90px" : "32px 20px 120px",
         }}
       >
         {/* NAV / TOP */}
@@ -167,15 +178,16 @@ function HomePage() {
           style={{
             display: "flex",
             justifyContent: "space-between",
-            alignItems: "center",
+            alignItems: isMobile ? "flex-start" : "center",
             gap: "16px",
             flexWrap: "wrap",
-            marginBottom: "34px",
+            flexDirection: isMobile ? "column" : "row",
+            marginBottom: isMobile ? "24px" : "34px",
           }}
         >
           <div
             style={{
-              fontSize: "20px",
+              fontSize: isMobile ? "18px" : "20px",
               fontWeight: 900,
               color: "#0f172a",
               letterSpacing: "-0.02em",
@@ -189,6 +201,7 @@ function HomePage() {
               display: "flex",
               gap: "10px",
               flexWrap: "wrap",
+              width: isMobile ? "100%" : "auto",
             }}
           >
             <a
@@ -197,7 +210,7 @@ function HomePage() {
                 textDecoration: "none",
                 color: "#475569",
                 fontWeight: 700,
-                padding: "10px 14px",
+                padding: isMobile ? "8px 0" : "10px 14px",
               }}
             >
               Producto
@@ -208,7 +221,7 @@ function HomePage() {
                 textDecoration: "none",
                 color: "#475569",
                 fontWeight: 700,
-                padding: "10px 14px",
+                padding: isMobile ? "8px 0" : "10px 14px",
               }}
             >
               Cómo funciona
@@ -219,7 +232,7 @@ function HomePage() {
                 textDecoration: "none",
                 color: "#475569",
                 fontWeight: 700,
-                padding: "10px 14px",
+                padding: isMobile ? "8px 0" : "10px 14px",
               }}
             >
               Sectores
@@ -230,7 +243,7 @@ function HomePage() {
                 textDecoration: "none",
                 color: "#475569",
                 fontWeight: 700,
-                padding: "10px 14px",
+                padding: isMobile ? "8px 0" : "10px 14px",
               }}
             >
               Panel
@@ -242,16 +255,16 @@ function HomePage() {
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: "1.25fr 0.95fr",
+            gridTemplateColumns: isMobile ? "1fr" : "1.25fr 0.95fr",
             gap: "26px",
             alignItems: "stretch",
-            marginBottom: "72px",
+            marginBottom: isMobile ? "54px" : "72px",
           }}
         >
           <div
             style={{
               ...cardStyle,
-              padding: "34px",
+              padding: isMobile ? "24px" : "34px",
               background:
                 "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,252,240,0.96) 100%)",
             }}
@@ -260,7 +273,7 @@ function HomePage() {
 
             <h1
               style={{
-                fontSize: "clamp(46px, 7vw, 78px)",
+                fontSize: "clamp(38px, 7vw, 78px)",
                 lineHeight: 0.97,
                 margin: "0 0 18px",
                 fontWeight: 900,
@@ -276,7 +289,7 @@ function HomePage() {
 
             <p
               style={{
-                fontSize: "clamp(18px, 2.2vw, 22px)",
+                fontSize: "clamp(17px, 2.2vw, 22px)",
                 lineHeight: 1.85,
                 color: "#475569",
                 maxWidth: "770px",
@@ -295,6 +308,7 @@ function HomePage() {
                 gap: "14px",
                 flexWrap: "wrap",
                 marginBottom: "26px",
+                flexDirection: isMobile ? "column" : "row",
               }}
             >
               <a
@@ -307,6 +321,7 @@ function HomePage() {
                   borderRadius: "14px",
                   fontWeight: 900,
                   boxShadow: "0 14px 30px rgba(245, 158, 11, 0.22)",
+                  textAlign: "center",
                 }}
               >
                 Conocer el producto
@@ -322,6 +337,7 @@ function HomePage() {
                   borderRadius: "14px",
                   fontWeight: 800,
                   border: "1px solid rgba(15, 23, 42, 0.08)",
+                  textAlign: "center",
                 }}
               >
                 Ver cómo funciona
@@ -331,7 +347,9 @@ function HomePage() {
             <div
               style={{
                 display: "grid",
-                gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))",
+                gridTemplateColumns: isMobile
+                  ? "1fr"
+                  : "repeat(auto-fit, minmax(180px, 1fr))",
                 gap: "14px",
               }}
             >
@@ -415,7 +433,7 @@ function HomePage() {
           <div
             style={{
               ...cardStyle,
-              padding: "30px",
+              padding: isMobile ? "24px" : "30px",
               display: "flex",
               flexDirection: "column",
               justifyContent: "space-between",
@@ -519,12 +537,12 @@ function HomePage() {
         </section>
 
         {/* PRODUCTO */}
-        <section id="producto" style={{ marginBottom: "74px" }}>
+        <section id="producto" style={{ marginBottom: isMobile ? "54px" : "74px" }}>
           <SectionLabel text="Qué es HoyMismo Assistant" />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: "22px",
               alignItems: "start",
               marginBottom: "24px",
@@ -572,12 +590,15 @@ function HomePage() {
         </section>
 
         {/* COMO FUNCIONA */}
-        <section id="como-funciona" style={{ marginBottom: "74px" }}>
+        <section
+          id="como-funciona"
+          style={{ marginBottom: isMobile ? "54px" : "74px" }}
+        >
           <SectionLabel text="Cómo funciona" />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: "22px",
               alignItems: "start",
               marginBottom: "24px",
@@ -629,12 +650,12 @@ function HomePage() {
         </section>
 
         {/* BENEFICIOS */}
-        <section style={{ marginBottom: "74px" }}>
+        <section style={{ marginBottom: isMobile ? "54px" : "74px" }}>
           <SectionLabel text="Beneficios principales" />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: "22px",
               alignItems: "start",
               marginBottom: "24px",
@@ -681,12 +702,12 @@ function HomePage() {
         </section>
 
         {/* SECTORES */}
-        <section id="sectores" style={{ marginBottom: "74px" }}>
+        <section id="sectores" style={{ marginBottom: isMobile ? "54px" : "74px" }}>
           <SectionLabel text="Sectores y escenarios de uso" />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: "22px",
               alignItems: "start",
               marginBottom: "24px",
@@ -733,12 +754,12 @@ function HomePage() {
         </section>
 
         {/* PANEL */}
-        <section id="panel" style={{ marginBottom: "74px" }}>
+        <section id="panel" style={{ marginBottom: isMobile ? "54px" : "74px" }}>
           <SectionLabel text="Panel administrativo" />
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "1fr 1fr",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
               gap: "22px",
               alignItems: "start",
               marginBottom: "24px",
@@ -761,7 +782,7 @@ function HomePage() {
           <div
             style={{
               ...cardStyle,
-              padding: "28px",
+              padding: isMobile ? "22px" : "28px",
             }}
           >
             <div
@@ -792,7 +813,7 @@ function HomePage() {
           <div
             style={{
               ...cardStyle,
-              padding: "34px",
+              padding: isMobile ? "24px" : "34px",
               background:
                 "linear-gradient(135deg, rgba(250,204,21,0.16), rgba(255,255,255,1))",
             }}
@@ -820,6 +841,7 @@ function HomePage() {
                 display: "flex",
                 gap: "14px",
                 flexWrap: "wrap",
+                flexDirection: isMobile ? "column" : "row",
               }}
             >
               <a
@@ -832,6 +854,7 @@ function HomePage() {
                   borderRadius: "14px",
                   fontWeight: 900,
                   boxShadow: "0 14px 30px rgba(245, 158, 11, 0.22)",
+                  textAlign: "center",
                 }}
               >
                 Explorar solución
@@ -847,6 +870,7 @@ function HomePage() {
                   borderRadius: "14px",
                   fontWeight: 800,
                   border: "1px solid rgba(15, 23, 42, 0.08)",
+                  textAlign: "center",
                 }}
               >
                 Ir al panel admin
