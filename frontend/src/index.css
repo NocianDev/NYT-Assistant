@@ -31,9 +31,17 @@ body,
   width: 100%;
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 body {
   background: linear-gradient(180deg, #fffdf5 0%, #fff9e6 35%, #ffffff 100%);
   color: var(--text-main);
+}
+
+a {
+  color: inherit;
 }
 
 button,
@@ -41,4 +49,21 @@ input,
 textarea,
 select {
   font: inherit;
+}
+
+img {
+  max-width: 100%;
+  display: block;
+}
+
+@media (max-width: 960px) {
+  section[style] {
+    scroll-margin-top: 24px;
+  }
+}
+
+@media (max-width: 900px) {
+  body {
+    overflow-x: hidden;
+  }
 }
