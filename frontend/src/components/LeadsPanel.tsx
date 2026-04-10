@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import axios from "axios";
 
 type Lead = {
@@ -8,6 +8,9 @@ type Lead = {
   name: string | null;
   phone: string | null;
   interested: boolean;
+  requestedDemo?: boolean;
+  selectedAgent?: string;
+  summary?: string;
   messages: string[];
   createdAt: string;
   updatedAt: string;
@@ -18,12 +21,69 @@ const API_URL =
 
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 
+function formatAgentName(agent?: string) {
+  switch (agent) {
+    case "sales":
+      return "Sales Agent";
+    case "support":
+      return "Support Agent";
+    case "scheduling":
+      return "Scheduling Agent";
+    case "general":
+      return "General Agent";
+    default:
+      return "No definido";
+  }
+}
+
+function StatCard({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid rgba(15, 23, 42, 0.08)",
+        borderRadius: "18px",
+        padding: "18px",
+        boxShadow: "0 14px 32px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "13px",
+          color: "#64748b",
+          fontWeight: 700,
+          marginBottom: "8px",
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "26px",
+          fontWeight: 900,
+          color: "#0f172a",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 export default function LeadsPanel() {
   const [password, setPassword] = useState("");
   const [authorized, setAuthorized] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [agentFilter, setAgentFilter] = useState("all");
+  const [search, setSearch] = useState("");
 
   async function loadLeads() {
     setLoading(true);
@@ -67,13 +127,38 @@ export default function LeadsPanel() {
     }
   }
 
+  const filteredLeads = useMemo(() => {
+    return leads.filter((lead) => {
+      const matchesAgent =
+        agentFilter === "all" || (lead.selectedAgent || "general") === agentFilter;
+
+      const text =
+        `${lead.name || ""} ${lead.phone || ""} ${lead.conversationId || ""} ${
+          lead.summary || ""
+        } ${lead.messages.join(" ")}`.toLowerCase();
+
+      const matchesSearch = text.includes(search.trim().toLowerCase());
+
+      return matchesAgent && matchesSearch;
+    });
+  }, [leads, agentFilter, search]);
+
+  const stats = useMemo(() => {
+    const total = leads.length;
+    const interested = leads.filter((lead) => lead.interested).length;
+    const demo = leads.filter((lead) => lead.requestedDemo).length;
+    const withPhone = leads.filter((lead) => Boolean(lead.phone)).length;
+
+    return { total, interested, demo, withPhone };
+  }, [leads]);
+
   if (!authorized) {
     return (
       <div
         style={{
           minHeight: "100vh",
           background:
-            "linear-gradient(180deg, #fffdf5 0%, #fff9e6 35%, #ffffff 100%)",
+            "linear-gradient(180deg, #fffdf7 0%, #fffaf2 50%, #fff8ef 100%)",
           color: "#0f172a",
           display: "flex",
           alignItems: "center",
@@ -178,13 +263,13 @@ export default function LeadsPanel() {
       style={{
         minHeight: "100vh",
         background:
-          "linear-gradient(180deg, #fffdf5 0%, #fff9e6 35%, #ffffff 100%)",
+          "linear-gradient(180deg, #fffdf7 0%, #fffaf2 50%, #fff8ef 100%)",
         color: "#0f172a",
         fontFamily: "Arial, sans-serif",
         padding: "30px 20px",
       }}
     >
-      <div style={{ maxWidth: "1150px", margin: "0 auto" }}>
+      <div style={{ maxWidth: "1180px", margin: "0 auto" }}>
         <div
           style={{
             display: "flex",
@@ -224,7 +309,7 @@ export default function LeadsPanel() {
             </h1>
 
             <p style={{ color: "#64748b", marginTop: "8px" }}>
-              Total: {leads.length}
+              Total visibles: {filteredLeads.length}
             </p>
           </div>
 
@@ -245,8 +330,69 @@ export default function LeadsPanel() {
           </button>
         </div>
 
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+            gap: "16px",
+            marginBottom: "22px",
+          }}
+        >
+          <StatCard label="Leads totales" value={stats.total} />
+          <StatCard label="Interesados" value={stats.interested} />
+          <StatCard label="Solicitudes de demo" value={stats.demo} />
+          <StatCard label="Con teléfono" value={stats.withPhone} />
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr 220px",
+            gap: "14px",
+            marginBottom: "20px",
+          }}
+        >
+          <input
+            type="text"
+            placeholder="Buscar por nombre, teléfono, resumen, conversación o mensaje..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "14px 16px",
+              borderRadius: "14px",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              background: "#ffffff",
+              color: "#0f172a",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          />
+
+          <select
+            value={agentFilter}
+            onChange={(e) => setAgentFilter(e.target.value)}
+            style={{
+              width: "100%",
+              padding: "14px 16px",
+              borderRadius: "14px",
+              border: "1px solid rgba(15, 23, 42, 0.08)",
+              background: "#ffffff",
+              color: "#0f172a",
+              outline: "none",
+              boxSizing: "border-box",
+            }}
+          >
+            <option value="all">Todos los agentes</option>
+            <option value="general">General Agent</option>
+            <option value="sales">Sales Agent</option>
+            <option value="support">Support Agent</option>
+            <option value="scheduling">Scheduling Agent</option>
+          </select>
+        </div>
+
         <div style={{ display: "grid", gap: "16px" }}>
-          {leads.length === 0 ? (
+          {filteredLeads.length === 0 ? (
             <div
               style={{
                 background: "#ffffff",
@@ -257,10 +403,10 @@ export default function LeadsPanel() {
                 boxShadow: "0 14px 32px rgba(15, 23, 42, 0.06)",
               }}
             >
-              No hay leads aún.
+              No hay leads que coincidan con los filtros.
             </div>
           ) : (
-            leads.map((lead) => (
+            filteredLeads.map((lead) => (
               <div
                 key={lead._id}
                 style={{
@@ -273,9 +419,119 @@ export default function LeadsPanel() {
               >
                 <div
                   style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    gap: "14px",
+                    flexWrap: "wrap",
+                    marginBottom: "16px",
+                    alignItems: "center",
+                  }}
+                >
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: "10px",
+                      flexWrap: "wrap",
+                    }}
+                  >
+                    <span
+                      style={{
+                        background: "rgba(250, 204, 21, 0.16)",
+                        color: "#92400e",
+                        border: "1px solid rgba(250, 204, 21, 0.28)",
+                        borderRadius: "999px",
+                        padding: "7px 12px",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {formatAgentName(lead.selectedAgent)}
+                    </span>
+
+                    <span
+                      style={{
+                        background: lead.interested
+                          ? "rgba(22, 163, 74, 0.12)"
+                          : "rgba(148, 163, 184, 0.14)",
+                        color: lead.interested ? "#166534" : "#475569",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        borderRadius: "999px",
+                        padding: "7px 12px",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {lead.interested ? "Interesado" : "Sin interés claro"}
+                    </span>
+
+                    <span
+                      style={{
+                        background: lead.requestedDemo
+                          ? "rgba(59, 130, 246, 0.12)"
+                          : "rgba(148, 163, 184, 0.14)",
+                        color: lead.requestedDemo ? "#1d4ed8" : "#475569",
+                        border: "1px solid rgba(15, 23, 42, 0.08)",
+                        borderRadius: "999px",
+                        padding: "7px 12px",
+                        fontSize: "12px",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {lead.requestedDemo ? "Solicitó demo" : "Sin demo"}
+                    </span>
+                  </div>
+
+                  <button
+                    onClick={() => deleteLead(lead._id)}
+                    style={{
+                      padding: "11px 14px",
+                      borderRadius: "12px",
+                      border: "none",
+                      background: "#ef4444",
+                      color: "white",
+                      cursor: "pointer",
+                      fontWeight: 700,
+                    }}
+                  >
+                    Eliminar lead
+                  </button>
+                </div>
+
+                <div
+                  style={{
+                    marginBottom: "16px",
+                    background: "#fff7cc",
+                    padding: "12px 14px",
+                    borderRadius: "14px",
+                    border: "1px solid rgba(250, 204, 21, 0.3)",
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: "13px",
+                      fontWeight: 800,
+                      color: "#92400e",
+                      marginBottom: "6px",
+                    }}
+                  >
+                    Resumen del lead
+                  </div>
+                  <div
+                    style={{
+                      color: "#334155",
+                      lineHeight: 1.6,
+                    }}
+                  >
+                    {lead.summary || "Sin resumen"}
+                  </div>
+                </div>
+
+                <div
+                  style={{
                     display: "grid",
+                    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
                     gap: "12px",
-                    marginBottom: "14px",
+                    marginBottom: "16px",
                   }}
                 >
                   <div>
@@ -284,18 +540,6 @@ export default function LeadsPanel() {
 
                   <div>
                     <strong>Teléfono:</strong> {lead.phone || "Sin teléfono"}
-                  </div>
-
-                  <div>
-                    <strong>Interesado:</strong>{" "}
-                    <span
-                      style={{
-                        color: lead.interested ? "#16a34a" : "#dc2626",
-                        fontWeight: 700,
-                      }}
-                    >
-                      {lead.interested ? "Sí" : "No"}
-                    </span>
                   </div>
 
                   <div>
@@ -313,41 +557,40 @@ export default function LeadsPanel() {
                   </div>
                 </div>
 
-                <div style={{ marginBottom: "12px" }}>
+                <div>
                   <strong>Mensajes:</strong>
-                  <div style={{ marginTop: "8px", display: "grid", gap: "8px" }}>
-                    {lead.messages.map((msg, i) => (
+                  <div style={{ marginTop: "10px", display: "grid", gap: "8px" }}>
+                    {lead.messages?.length ? (
+                      lead.messages.map((msg, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            background: "#f8fafc",
+                            border: "1px solid rgba(15, 23, 42, 0.06)",
+                            padding: "10px 12px",
+                            borderRadius: "12px",
+                            color: "#334155",
+                            whiteSpace: "pre-wrap",
+                          }}
+                        >
+                          {msg}
+                        </div>
+                      ))
+                    ) : (
                       <div
-                        key={i}
                         style={{
                           background: "#f8fafc",
                           border: "1px solid rgba(15, 23, 42, 0.06)",
                           padding: "10px 12px",
                           borderRadius: "12px",
-                          color: "#334155",
+                          color: "#64748b",
                         }}
                       >
-                        {msg}
+                        No hay mensajes guardados.
                       </div>
-                    ))}
+                    )}
                   </div>
                 </div>
-
-                <button
-                  onClick={() => deleteLead(lead._id)}
-                  style={{
-                    marginTop: "10px",
-                    padding: "11px 14px",
-                    borderRadius: "12px",
-                    border: "none",
-                    background: "#ef4444",
-                    color: "white",
-                    cursor: "pointer",
-                    fontWeight: 700,
-                  }}
-                >
-                  Eliminar lead
-                </button>
               </div>
             ))
           )}

@@ -2,27 +2,30 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { useEffect, useState } from "react";
 import AssistantWidget from "./components/AssistantWidget";
 import LeadsPanel from "./components/LeadsPanel";
+import VoiceAssistant from "./components/VoiceAssistant";
+import VoiceWidget from "./components/VoiceWidget";
+
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
 
-const sectionTitleStyle = {
+const sectionTitleStyle: React.CSSProperties = {
   fontSize: "clamp(28px, 4vw, 42px)",
-  lineHeight: 1.1,
+  lineHeight: 1.08,
   margin: 0,
   color: "#0f172a",
   fontWeight: 900,
   letterSpacing: "-0.03em",
 };
 
-const sectionTextStyle = {
-  color: "#64748b",
+const sectionTextStyle: React.CSSProperties = {
+  color: "#475569",
   fontSize: "17px",
   lineHeight: 1.8,
   margin: 0,
 };
 
-const cardStyle = {
+const cardStyle: React.CSSProperties = {
   background: "#ffffff",
   border: "1px solid rgba(15, 23, 42, 0.08)",
   borderRadius: "24px",
@@ -145,6 +148,237 @@ function UseCaseCard({
   );
 }
 
+function HeroMetric({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid rgba(15, 23, 42, 0.08)",
+        borderRadius: "18px",
+        padding: "16px 18px",
+        boxShadow: "0 14px 28px rgba(15, 23, 42, 0.06)",
+      }}
+    >
+      <div
+        style={{
+          fontSize: "12px",
+          color: "#64748b",
+          marginBottom: "6px",
+          fontWeight: 700,
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontSize: "18px",
+          fontWeight: 900,
+          color: "#0f172a",
+        }}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
+function MockupPanel({ isMobile }: { isMobile: boolean }) {
+  return (
+    <div
+      style={{
+        background: "#ffffff",
+        border: "1px solid rgba(15, 23, 42, 0.08)",
+        borderRadius: "28px",
+        padding: isMobile ? "20px" : "24px",
+        boxShadow: "0 30px 60px rgba(15, 23, 42, 0.12)",
+      }}
+    >
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "16px",
+        }}
+      >
+        <div>
+          <div
+            style={{
+              color: "#0f172a",
+              fontWeight: 900,
+              fontSize: "18px",
+            }}
+          >
+            HoyMismo Assistant
+          </div>
+          <div
+            style={{
+              color: "#64748b",
+              fontSize: "13px",
+              marginTop: "4px",
+            }}
+          >
+            Multiagente · Leads · Voz · Automatización
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "rgba(250, 204, 21, 0.16)",
+            color: "#92400e",
+            border: "1px solid rgba(250, 204, 21, 0.25)",
+            borderRadius: "999px",
+            padding: "8px 12px",
+            fontSize: "12px",
+            fontWeight: 800,
+          }}
+        >
+          En línea
+        </div>
+      </div>
+
+      <div
+        style={{
+          display: "grid",
+          gap: "14px",
+        }}
+      >
+        <div
+          style={{
+            background: "#f8fafc",
+            border: "1px solid rgba(15, 23, 42, 0.06)",
+            borderRadius: "18px",
+            padding: "16px",
+          }}
+        >
+          <div
+            style={{
+              color: "#0f172a",
+              fontWeight: 800,
+              marginBottom: "10px",
+            }}
+          >
+            Conversación activa
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gap: "10px",
+            }}
+          >
+            <div
+              style={{
+                alignSelf: "flex-start",
+                background: "#ffffff",
+                color: "#334155",
+                padding: "10px 12px",
+                borderRadius: "14px",
+                maxWidth: "80%",
+                fontSize: "14px",
+                lineHeight: 1.5,
+                border: "1px solid rgba(15, 23, 42, 0.06)",
+              }}
+            >
+              Hola, quiero automatizar WhatsApp para mi negocio.
+            </div>
+
+            <div
+              style={{
+                marginLeft: "auto",
+                background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                color: "#111827",
+                padding: "10px 12px",
+                borderRadius: "14px",
+                maxWidth: "84%",
+                fontSize: "14px",
+                lineHeight: 1.5,
+                fontWeight: 700,
+              }}
+            >
+              Perfecto. Podemos ayudarte a responder clientes 24/7, captar
+              leads y convertir más conversaciones en ventas. ¿Qué tipo de
+              negocio tienes?
+            </div>
+          </div>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+            gap: "14px",
+          }}
+        >
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid rgba(15, 23, 42, 0.06)",
+              borderRadius: "18px",
+              padding: "16px",
+            }}
+          >
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: "12px",
+                fontWeight: 700,
+                marginBottom: "8px",
+              }}
+            >
+              Agente activo
+            </div>
+            <div
+              style={{
+                color: "#0f172a",
+                fontSize: "18px",
+                fontWeight: 900,
+              }}
+            >
+              Sales Agent
+            </div>
+          </div>
+
+          <div
+            style={{
+              background: "#f8fafc",
+              border: "1px solid rgba(15, 23, 42, 0.06)",
+              borderRadius: "18px",
+              padding: "16px",
+            }}
+          >
+            <div
+              style={{
+                color: "#64748b",
+                fontSize: "12px",
+                fontWeight: 700,
+                marginBottom: "8px",
+              }}
+            >
+              Acción detectada
+            </div>
+            <div
+              style={{
+                color: "#0f172a",
+                fontSize: "18px",
+                fontWeight: 900,
+              }}
+            >
+              Lead calificado
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function HomePage() {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 900 : false
@@ -161,7 +395,7 @@ function HomePage() {
       style={{
         minHeight: "100vh",
         background:
-          "linear-gradient(180deg, #fffdf5 0%, #fff9e6 28%, #ffffff 58%, #fffdf7 100%)",
+          "linear-gradient(180deg, #fffdf7 0%, #fffaf2 50%, #fff8ef 100%)",
         color: "#0f172a",
         fontFamily: "Arial, sans-serif",
       }}
@@ -170,10 +404,10 @@ function HomePage() {
         style={{
           maxWidth: "1180px",
           margin: "0 auto",
-          padding: isMobile ? "24px 16px 90px" : "32px 20px 120px",
+          padding: isMobile ? "22px 16px 90px" : "28px 20px 120px",
         }}
       >
-        {/* NAV / TOP */}
+        {/* NAV */}
         <div
           style={{
             display: "flex",
@@ -182,7 +416,7 @@ function HomePage() {
             gap: "16px",
             flexWrap: "wrap",
             flexDirection: isMobile ? "column" : "row",
-            marginBottom: isMobile ? "24px" : "34px",
+            marginBottom: isMobile ? "28px" : "34px",
           }}
         >
           <div
@@ -204,50 +438,26 @@ function HomePage() {
               width: isMobile ? "100%" : "auto",
             }}
           >
-            <a
-              href="#producto"
-              style={{
-                textDecoration: "none",
-                color: "#475569",
-                fontWeight: 700,
-                padding: isMobile ? "8px 0" : "10px 14px",
-              }}
-            >
-              Producto
-            </a>
-            <a
-              href="#como-funciona"
-              style={{
-                textDecoration: "none",
-                color: "#475569",
-                fontWeight: 700,
-                padding: isMobile ? "8px 0" : "10px 14px",
-              }}
-            >
-              Cómo funciona
-            </a>
-            <a
-              href="#sectores"
-              style={{
-                textDecoration: "none",
-                color: "#475569",
-                fontWeight: 700,
-                padding: isMobile ? "8px 0" : "10px 14px",
-              }}
-            >
-              Sectores
-            </a>
-            <a
-              href="#panel"
-              style={{
-                textDecoration: "none",
-                color: "#475569",
-                fontWeight: 700,
-                padding: isMobile ? "8px 0" : "10px 14px",
-              }}
-            >
-              Panel
-            </a>
+            {[
+              ["#producto", "Producto"],
+              ["#como-funciona", "Cómo funciona"],
+              ["#agentes", "Agentes"],
+              ["#sectores", "Sectores"],
+              ["#panel", "Panel"],
+            ].map(([href, label]) => (
+              <a
+                key={href}
+                href={href}
+                style={{
+                  textDecoration: "none",
+                  color: "#334155",
+                  fontWeight: 700,
+                  padding: isMobile ? "8px 0" : "10px 14px",
+                }}
+              >
+                {label}
+              </a>
+            ))}
           </div>
         </div>
 
@@ -255,51 +465,59 @@ function HomePage() {
         <section
           style={{
             display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1.25fr 0.95fr",
-            gap: "26px",
-            alignItems: "stretch",
-            marginBottom: isMobile ? "54px" : "72px",
+            gridTemplateColumns: isMobile ? "1fr" : "1.06fr 0.94fr",
+            gap: "28px",
+            alignItems: "center",
+            marginBottom: isMobile ? "56px" : "76px",
           }}
         >
-          <div
-            style={{
-              ...cardStyle,
-              padding: isMobile ? "24px" : "34px",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.96) 0%, rgba(255,252,240,0.96) 100%)",
-            }}
-          >
-            <SectionLabel text="Asistente virtual 24/7" />
+          <div>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "8px",
+                background: "rgba(250, 204, 21, 0.16)",
+                color: "#a16207",
+                border: "1px solid rgba(250, 204, 21, 0.28)",
+                borderRadius: "999px",
+                padding: "8px 14px",
+                fontSize: "13px",
+                fontWeight: 800,
+                marginBottom: "18px",
+              }}
+            >
+              IA multiagente para atención, ventas y operación
+            </div>
 
             <h1
               style={{
-                fontSize: "clamp(38px, 7vw, 78px)",
-                lineHeight: 0.97,
+                fontSize: "clamp(40px, 7vw, 78px)",
+                lineHeight: 0.96,
                 margin: "0 0 18px",
                 fontWeight: 900,
                 letterSpacing: "-0.05em",
-                background: "linear-gradient(90deg, #facc15, #f59e0b, #111827)",
-                WebkitBackgroundClip: "text",
-                color: "transparent",
-                maxWidth: "920px",
+                color: "#0f172a",
+                maxWidth: "900px",
               }}
             >
-              Atención automática, captura de leads y presencia profesional en un solo producto
+              Automatiza conversaciones, captura oportunidades y prepara tu
+              negocio para voz.
             </h1>
 
             <p
               style={{
                 fontSize: "clamp(17px, 2.2vw, 22px)",
-                lineHeight: 1.85,
+                lineHeight: 1.8,
                 color: "#475569",
-                maxWidth: "770px",
+                maxWidth: "760px",
                 marginBottom: "26px",
               }}
             >
               HoyMismo Assistant es una solución pensada para empresas,
-              negocios, clínicas, hospitales y servicios que quieren responder
-              más rápido, automatizar conversaciones y transformar visitas en
-              oportunidades reales de contacto.
+              clínicas, hospitales y negocios que necesitan responder más
+              rápido, calificar leads, organizar conversaciones y evolucionar
+              hacia asistentes por voz en tiempo real.
             </p>
 
             <div
@@ -307,7 +525,7 @@ function HomePage() {
                 display: "flex",
                 gap: "14px",
                 flexWrap: "wrap",
-                marginBottom: "26px",
+                marginBottom: "28px",
                 flexDirection: isMobile ? "column" : "row",
               }}
             >
@@ -320,15 +538,15 @@ function HomePage() {
                   padding: "14px 18px",
                   borderRadius: "14px",
                   fontWeight: 900,
-                  boxShadow: "0 14px 30px rgba(245, 158, 11, 0.22)",
+                  boxShadow: "0 16px 34px rgba(245, 158, 11, 0.24)",
                   textAlign: "center",
                 }}
               >
-                Conocer el producto
+                Explorar solución
               </a>
 
               <a
-                href="#como-funciona"
+                href="/admin"
                 style={{
                   textDecoration: "none",
                   background: "#ffffff",
@@ -340,7 +558,7 @@ function HomePage() {
                   textAlign: "center",
                 }}
               >
-                Ver cómo funciona
+                Ver panel admin
               </a>
             </div>
 
@@ -353,187 +571,13 @@ function HomePage() {
                 gap: "14px",
               }}
             >
-              <div
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid rgba(15, 23, 42, 0.08)",
-                  borderRadius: "18px",
-                  padding: "16px 18px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#64748b",
-                    marginBottom: "6px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Atención
-                </div>
-                <div
-                  style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a" }}
-                >
-                  Disponible 24/7
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid rgba(15, 23, 42, 0.08)",
-                  borderRadius: "18px",
-                  padding: "16px 18px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#64748b",
-                    marginBottom: "6px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Captura
-                </div>
-                <div
-                  style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a" }}
-                >
-                  Leads automáticos
-                </div>
-              </div>
-
-              <div
-                style={{
-                  background: "#ffffff",
-                  border: "1px solid rgba(15, 23, 42, 0.08)",
-                  borderRadius: "18px",
-                  padding: "16px 18px",
-                }}
-              >
-                <div
-                  style={{
-                    fontSize: "13px",
-                    color: "#64748b",
-                    marginBottom: "6px",
-                    fontWeight: 700,
-                  }}
-                >
-                  Experiencia
-                </div>
-                <div
-                  style={{ fontSize: "18px", fontWeight: 900, color: "#0f172a" }}
-                >
-                  Chat y voz
-                </div>
-              </div>
+              <HeroMetric label="Atención" value="Disponible 24/7" />
+              <HeroMetric label="Arquitectura" value="Multiagente" />
+              <HeroMetric label="Evolución" value="Lista para voz" />
             </div>
           </div>
 
-          <div
-            style={{
-              ...cardStyle,
-              padding: isMobile ? "24px" : "30px",
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "space-between",
-              background:
-                "linear-gradient(180deg, rgba(255,255,255,0.98) 0%, rgba(255,248,220,0.98) 100%)",
-            }}
-          >
-            <div>
-              <SectionLabel text="Propuesta de valor" />
-              <h2 style={{ ...sectionTitleStyle, marginBottom: "14px" }}>
-                Un producto pensado para atención, información y conversión
-              </h2>
-              <p style={{ ...sectionTextStyle, marginBottom: "18px" }}>
-                No se trata solo de un chatbot. Es una experiencia diseñada para
-                responder dudas, orientar usuarios, generar confianza y captar
-                oportunidades sin que tu equipo tenga que estar disponible todo
-                el tiempo.
-              </p>
-
-              <div
-                style={{
-                  display: "grid",
-                  gap: "12px",
-                }}
-              >
-                {[
-                  "Responde consultas frecuentes de forma inmediata.",
-                  "Se adapta a negocios, clínicas, hospitales y servicios.",
-                  "Identifica interés y guarda leads automáticamente.",
-                  "Centraliza la información en un panel administrable.",
-                ].map((item) => (
-                  <div
-                    key={item}
-                    style={{
-                      display: "flex",
-                      gap: "10px",
-                      alignItems: "flex-start",
-                      color: "#334155",
-                      lineHeight: 1.7,
-                    }}
-                  >
-                    <span style={{ color: "#f59e0b", fontWeight: 900 }}>●</span>
-                    <span>{item}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            <div
-              style={{
-                marginTop: "26px",
-                background: "#ffffff",
-                border: "1px solid rgba(15, 23, 42, 0.08)",
-                borderRadius: "20px",
-                padding: "20px",
-              }}
-            >
-              <div
-                style={{
-                  fontSize: "14px",
-                  color: "#64748b",
-                  fontWeight: 700,
-                  marginBottom: "8px",
-                }}
-              >
-                Ideal para
-              </div>
-              <div
-                style={{
-                  display: "flex",
-                  flexWrap: "wrap",
-                  gap: "10px",
-                }}
-              >
-                {[
-                  "Empresas",
-                  "Negocios locales",
-                  "Clínicas",
-                  "Hospitales",
-                  "Servicios profesionales",
-                  "Atención interna",
-                ].map((tag) => (
-                  <span
-                    key={tag}
-                    style={{
-                      background: "rgba(250, 204, 21, 0.16)",
-                      color: "#92400e",
-                      border: "1px solid rgba(250, 204, 21, 0.3)",
-                      borderRadius: "999px",
-                      padding: "8px 12px",
-                      fontSize: "13px",
-                      fontWeight: 800,
-                    }}
-                  >
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
+          <MockupPanel isMobile={isMobile} />
         </section>
 
         {/* PRODUCTO */}
@@ -555,10 +599,10 @@ function HomePage() {
             </div>
             <div>
               <p style={sectionTextStyle}>
-                HoyMismo Assistant combina conversación inteligente, captación
-                de datos, atención continua y administración de leads en una
-                misma herramienta. El objetivo es que cualquier visitante reciba
-                orientación rápida, útil y profesional desde el primer contacto.
+                HoyMismo Assistant combina conversación inteligente, memoria
+                contextual, captación de datos, administración de leads y una
+                arquitectura multiagente para resolver diferentes tipos de
+                interacción desde un mismo sistema.
               </p>
             </div>
           </div>
@@ -572,19 +616,19 @@ function HomePage() {
           >
             <FeatureCard
               title="Atención inmediata"
-              text="Responde en segundos a preguntas frecuentes, solicitudes de información y consultas iniciales para reducir tiempos de espera."
+              text="Responde en segundos a preguntas frecuentes, solicitudes de información y consultas iniciales con una experiencia clara y profesional."
             />
             <FeatureCard
               title="Captura de oportunidades"
-              text="Cuando detecta interés real, solicita los datos clave y los organiza automáticamente para seguimiento posterior."
+              text="Cuando detecta intención comercial, solicita datos clave y los guarda para seguimiento posterior desde el panel."
             />
             <FeatureCard
-              title="Experiencia flexible"
-              text="Puede atender por texto y voz, adaptándose a diferentes tipos de usuarios y contextos de servicio."
+              title="Memoria contextual"
+              text="Mantiene el contexto reciente de la conversación para responder de forma más coherente y útil."
             />
             <FeatureCard
-              title="Presencia profesional"
-              text="Ayuda a que tu sitio web no se vea como una página estática, sino como una solución moderna, activa y orientada a resultados."
+              title="Preparado para voz"
+              text="La lógica del backend queda lista para evolucionar de chat a una experiencia de llamada o asistente hablado."
             />
           </div>
         </section>
@@ -606,15 +650,14 @@ function HomePage() {
           >
             <div>
               <h2 style={{ ...sectionTitleStyle, marginBottom: "14px" }}>
-                Un flujo simple, claro y pensado para resultados reales
+                Un flujo pensado para conversar, clasificar y actuar
               </h2>
             </div>
             <div>
               <p style={sectionTextStyle}>
-                El visitante entra al sitio, interactúa con el asistente,
-                resuelve dudas, recibe orientación y, cuando existe oportunidad,
-                el sistema guarda el lead para que el equipo pueda dar
-                seguimiento desde el panel administrativo.
+                El visitante entra al sitio, inicia conversación, el sistema
+                identifica la intención, envía el caso al agente adecuado y,
+                cuando existe oportunidad, registra el lead para seguimiento.
               </p>
             </div>
           </div>
@@ -628,23 +671,75 @@ function HomePage() {
           >
             <StepCard
               number="1"
-              title="El visitante inicia conversación"
-              text="El usuario entra al sitio y abre el asistente desde cualquier dispositivo para preguntar o pedir información."
+              title="El usuario inicia conversación"
+              text="Puede preguntar, pedir información o mostrar interés desde cualquier dispositivo."
             />
             <StepCard
               number="2"
-              title="La IA orienta y responde"
-              text="El sistema responde con tono profesional, se adapta al contexto y guía la conversación según el tipo de usuario."
+              title="El router detecta intención"
+              text="La arquitectura multiagente clasifica si la conversación requiere enfoque comercial, soporte o agendamiento."
             />
             <StepCard
               number="3"
-              title="Se detecta intención"
-              text="Si hay interés comercial o necesidad concreta, el sistema solicita datos como nombre o teléfono de manera natural."
+              title="El agente responde"
+              text="Cada agente atiende con un enfoque distinto, manteniendo tono profesional y utilidad real."
             />
             <StepCard
               number="4"
-              title="El lead queda disponible"
-              text="La información se guarda automáticamente y se muestra en el panel para consulta, seguimiento o administración."
+              title="Se ejecuta una acción"
+              text="Si hay oportunidad, el sistema guarda datos, marca solicitudes relevantes y las deja listas para operación."
+            />
+          </div>
+        </section>
+
+        {/* AGENTES */}
+        <section id="agentes" style={{ marginBottom: isMobile ? "54px" : "74px" }}>
+          <SectionLabel text="Arquitectura multiagente" />
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+              gap: "22px",
+              alignItems: "start",
+              marginBottom: "24px",
+            }}
+          >
+            <div>
+              <h2 style={{ ...sectionTitleStyle, marginBottom: "14px" }}>
+                Agentes especializados que trabajan dentro del mismo sistema
+              </h2>
+            </div>
+            <div>
+              <p style={sectionTextStyle}>
+                En lugar de depender de un solo bot genérico, la solución puede
+                distribuir la conversación entre agentes especializados según el
+                tipo de necesidad detectada.
+              </p>
+            </div>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))",
+              gap: "18px",
+            }}
+          >
+            <FeatureCard
+              title="Router Agent"
+              text="Clasifica el tipo de interacción y decide qué agente debe tomar la conversación."
+            />
+            <FeatureCard
+              title="Sales Agent"
+              text="Detecta intención comercial, explica valor, califica oportunidades y lleva a contacto o demo."
+            />
+            <FeatureCard
+              title="Support Agent"
+              text="Resuelve dudas frecuentes, orienta usuarios y da respuestas claras sin presionar comercialmente."
+            />
+            <FeatureCard
+              title="Scheduling Agent"
+              text="Identifica solicitudes de demo, llamada o reunión y las encamina como acción operativa."
             />
           </div>
         </section>
@@ -668,9 +763,9 @@ function HomePage() {
             </div>
             <div>
               <p style={sectionTextStyle}>
-                Esta solución está pensada para mejorar la experiencia de quien
-                visita tu sitio, pero también para ayudarte a aprovechar mejor
-                cada oportunidad de contacto que llega a tu página.
+                Esta solución no solo mejora la experiencia del visitante. También
+                ayuda a aprovechar mejor cada oportunidad de contacto que llega al
+                sitio web.
               </p>
             </div>
           </div>
@@ -688,15 +783,15 @@ function HomePage() {
             />
             <FeatureCard
               title="Menos fricción"
-              text="El usuario obtiene respuesta sin tener que buscar teléfonos, formularios o esperar atención manual."
+              text="El usuario obtiene respuesta rápida sin depender de formularios largos o atención manual."
             />
             <FeatureCard
-              title="Mejor calificación de leads"
-              text="Desde la primera interacción puedes detectar intención, tipo de necesidad y oportunidad real."
+              title="Mejor calificación"
+              text="Desde la primera interacción puedes detectar intención, necesidad y oportunidad real."
             />
             <FeatureCard
               title="Escalabilidad"
-              text="Puede adaptarse a distintos tipos de empresa, procesos y sectores sin rehacer toda la solución desde cero."
+              text="La solución puede crecer desde chat web hasta una experiencia de voz y automatización operativa."
             />
           </div>
         </section>
@@ -720,9 +815,8 @@ function HomePage() {
             </div>
             <div>
               <p style={sectionTextStyle}>
-                El producto no está limitado a ventas. También puede utilizarse
-                como una herramienta de orientación, información y apoyo
-                operativo para distintos tipos de organización.
+                El producto puede utilizarse en ventas, información, orientación,
+                captación y soporte inicial para distintos tipos de organización.
               </p>
             </div>
           </div>
@@ -736,19 +830,19 @@ function HomePage() {
           >
             <UseCaseCard
               title="Negocios y empresas"
-              text="Ideal para captar clientes, responder preguntas frecuentes, cotizar servicios y acompañar al visitante hacia una propuesta o contacto."
+              text="Ideal para captar clientes, responder preguntas frecuentes, cotizar servicios y acompañar al visitante hacia una propuesta."
             />
             <UseCaseCard
               title="Clínicas y hospitales"
-              text="Puede ayudar a orientar usuarios, atender preguntas comunes, facilitar información y reducir carga en atención inicial."
+              text="Puede ayudar a orientar usuarios, atender dudas comunes y reducir carga en atención inicial."
             />
             <UseCaseCard
               title="Servicios profesionales"
-              text="Útil para despachos, consultorías y equipos que necesitan filtrar solicitudes y organizar mejor los contactos entrantes."
+              text="Útil para despachos, consultorías y equipos que necesitan filtrar solicitudes y organizar mejor sus contactos."
             />
             <UseCaseCard
               title="Operación interna"
-              text="También puede usarse como asistente informativo o de apoyo para procesos internos, recepción o comunicación inicial."
+              text="También puede usarse como asistente informativo o de apoyo para procesos internos y recepción."
             />
           </div>
         </section>
@@ -773,8 +867,8 @@ function HomePage() {
             <div>
               <p style={sectionTextStyle}>
                 Además del asistente, el sistema incluye un panel desde el que
-                es posible revisar conversaciones, ver datos capturados y dar
-                seguimiento a las oportunidades detectadas.
+                puedes revisar conversaciones, datos capturados e intención
+                detectada.
               </p>
             </div>
           </div>
@@ -798,15 +892,48 @@ function HomePage() {
               />
               <FeatureCard
                 title="Gestión simple"
-                text="El panel está diseñado para actualizar, revisar y administrar leads sin depender de herramientas complicadas."
+                text="El panel está diseñado para revisar y administrar leads sin depender de herramientas complejas."
               />
               <FeatureCard
                 title="Visibilidad operativa"
-                text="Permite entender qué preguntas llegan, qué necesidades se repiten y cuáles contactos merecen seguimiento inmediato."
+                text="Permite entender qué preguntas llegan, qué necesidades se repiten y qué contactos merecen seguimiento."
               />
             </div>
           </div>
         </section>
+
+
+        {/* VOZ / LLAMADA */}
+<section style={{ marginBottom: isMobile ? "54px" : "74px" }}>
+  <SectionLabel text="Siguiente evolución" />
+  <div
+    style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+      gap: "22px",
+      alignItems: "start",
+      marginBottom: "24px",
+    }}
+  >
+    <div>
+      <h2 style={{ ...sectionTitleStyle, marginBottom: "14px" }}>
+        El siguiente salto es convertir el asistente en una experiencia de voz
+      </h2>
+    </div>
+    <div>
+      <p style={sectionTextStyle}>
+        Esta interfaz representa la transición natural de un chat web hacia una
+        experiencia de llamada, donde el usuario habla, el sistema procesa y el
+        asistente responde con voz y presencia visual más avanzada.
+      </p>
+    </div>
+  </div>
+
+  <VoiceAssistant
+    assistantName="HoyMismo Assistant"
+    subtitle="Demo visual preparada para voz en tiempo real"
+  />
+</section>
 
         {/* CTA FINAL */}
         <section>
@@ -820,7 +947,7 @@ function HomePage() {
           >
             <SectionLabel text="Siguiente paso" />
             <h2 style={{ ...sectionTitleStyle, marginBottom: "16px" }}>
-              Una solución lista para mostrar, implementar y escalar
+              Una base sólida para vender, implementar y evolucionar a voz
             </h2>
             <p
               style={{
@@ -829,11 +956,10 @@ function HomePage() {
                 marginBottom: "24px",
               }}
             >
-              HoyMismo Assistant ya integra atención automática, captura de
-              leads y panel de administración en una propuesta clara y
-              profesional. Es una base sólida para implementar en clientes,
-              vender como producto o seguir evolucionando hacia un sistema más
-              avanzado.
+              HoyMismo Assistant ya integra atención automática, clasificación
+              por agentes, captura de leads y panel administrativo dentro de una
+              misma propuesta. Es una base seria para seguir creciendo hacia una
+              experiencia de llamada y automatización más avanzada.
             </p>
 
             <div
@@ -880,12 +1006,14 @@ function HomePage() {
         </section>
       </div>
 
-      <AssistantWidget
+            <AssistantWidget
         title="HoyMismo Assistant"
         welcomeMessage="Hola 👋 Bienvenido a Tecnología Hoy Mismo. ¿En qué puedo ayudarte hoy?"
         primaryColor="#facc15"
         apiUrl={`${API_URL}/chat`}
       />
+
+      <VoiceWidget assistantName="HoyMismo Voice" />
     </div>
   );
 }

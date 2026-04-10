@@ -56,6 +56,12 @@ app.get("/health", (req, res) => {
   res.json({ ok: true });
 });
 
+/**
+ * =========================================
+ * UTILIDADES
+ * =========================================
+ */
+
 function extractPhone(text) {
   const match = text.match(/(?:\+?\d[\d\s\-()]{7,}\d)/);
   if (!match) return null;
@@ -110,8 +116,60 @@ function detectInterest(text) {
     "automatizacion",
     "asistente virtual",
     "ia",
+    "demo",
+    "agendar",
+    "llamada",
   ].some((term) => lower.includes(term));
 }
+
+function wantsDemo(text) {
+  const lower = text.toLowerCase();
+  return [
+    "demo",
+    "agendar",
+    "agenda",
+    "llamada",
+    "reunión",
+    "reunion",
+    "quiero hablar",
+    "quiero una llamada",
+    "quiero agendar",
+    "quiero una demo",
+  ].some((term) => lower.includes(term));
+}
+
+function normalizeText(text = "") {
+  return text.trim().toLowerCase();
+}
+
+/**
+ * =========================================
+ * MEMORIA CONVERSACIONAL
+ * =========================================
+ */
+
+const conversationMemory = new Map();
+const MAX_HISTORY_MESSAGES = 12;
+
+function getConversationHistory(conversationId) {
+  return conversationMemory.get(conversationId) || [];
+}
+
+function appendConversationMessage(conversationId, role, content) {
+  const current = conversationMemory.get(conversationId) || [];
+  const next = [...current, { role, content }].slice(-MAX_HISTORY_MESSAGES);
+  conversationMemory.set(conversationId, next);
+}
+
+function clearConversationHistory(conversationId) {
+  conversationMemory.delete(conversationId);
+}
+
+/**
+ * =========================================
+ * TENANT
+ * =========================================
+ */
 
 async function requireTenant(req, res, next) {
   try {
@@ -138,106 +196,425 @@ async function requireTenant(req, res, next) {
   }
 }
 
-function buildPromptByTenant(tenant) {
+/**
+ * =========================================
+ * MULTIAGENTE
+ * =========================================
+ */
+
+function routeAgent(message) {
+  const text = normalizeText(message);
+
+  if (
+    [
+      "precio",
+      "cotizacion",
+      "cotización",
+      "contratar",
+      "servicio",
+      "pagina",
+      "página",
+      "web",
+      "whatsapp",
+      "automatizacion",
+      "automatización",
+      "chatbot",
+      "ia",
+      "ventas",
+    ].some((term) => text.includes(term))
+  ) {
+    return "sales";
+  }
+
+  if (
+    [
+      "demo",
+      "agendar",
+      "agenda",
+      "reunión",
+      "reunion",
+      "llamada",
+      "cita",
+      "horario",
+    ].some((term) => text.includes(term))
+  ) {
+    return "scheduling";
+  }
+
+  if (
+    [
+      "como funciona",
+      "cómo funciona",
+      "qué hace",
+      "que hace",
+      "dudas",
+      "ayuda",
+      "información",
+      "informacion",
+      "soporte",
+      "pregunta",
+      "faq",
+    ].some((term) => text.includes(term))
+  ) {
+    return "support";
+  }
+
+  return "general";
+}
+
+function buildBaseContext(tenant) {
   const tone = tenant?.config?.tone || "mixto";
 
-  if (tone === "salud") {
-    return `
-Eres un asistente virtual profesional para una institución de salud.
+  return `
+Empresa: ${tenant?.name || "Empresa de tecnología"}
 
-Tu función es:
-- orientar usuarios
-- resolver dudas frecuentes
-- ayudar con información clara
-- mantener un tono serio, respetuoso y profesional
+Servicios principales:
+- páginas web profesionales
+- automatización de procesos
+- chatbots
+- asistentes virtuales con IA
+- soluciones digitales para empresas, clínicas, hospitales y negocios
 
-Reglas:
+Tono configurado del tenant: ${tone}
+
+Reglas globales:
 - nunca digas que eres una IA
-- responde en máximo 1–3 líneas
-- evita vender de forma agresiva
-- enfócate en orientación, confianza y claridad
-- si detectas interés real en implementar una solución, pide datos de contacto con naturalidad
+- responde en máximo 1 a 3 líneas, salvo que realmente haga falta más
+- habla claro, humano y profesional
+- evita lenguaje técnico innecesario
+- ayuda primero y vende cuando sea natural
+`;
+}
 
-Meta:
-Ayudar primero, transmitir confianza y guiar al siguiente paso cuando sea adecuado.
+function buildAgentPrompt(agent, tenant) {
+  const base = buildBaseContext(tenant);
+
+  if (agent === "sales") {
+    return `
+${base}
+
+Eres el AGENTE COMERCIAL.
+
+Objetivos:
+- detectar necesidad
+- generar confianza
+- explicar el valor del producto
+- pedir nombre y WhatsApp cuando haya interés claro
+- llevar a demo, cotización o contacto
+
+Estilo:
+- directo
+- comercial
+- seguro
+- natural
+- sin sonar agresivo
+
+Prioridades:
+1. entender qué necesita el usuario
+2. orientar con claridad
+3. convertir si existe interés
 `;
   }
 
-  if (tone === "ventas") {
+  if (agent === "support") {
     return `
-Eres un asesor comercial de una empresa de tecnología.
+${base}
 
-Tu objetivo es:
-- atender clientes
-- generar confianza
-- detectar interés
-- llevar a la conversación hacia contacto o cotización
+Eres el AGENTE DE SOPORTE E INFORMACIÓN.
 
-Reglas:
-- nunca digas que eres una IA
-- responde en máximo 1–3 líneas
-- sé directo, natural y comercial
-- pide nombre y WhatsApp cuando detectes oportunidad clara
-- evita respuestas largas
+Objetivos:
+- resolver dudas frecuentes
+- explicar cómo funciona la solución
+- orientar sin presionar
+- mantener claridad y confianza
 
-Meta:
-Convertir conversaciones en leads reales.
+Estilo:
+- útil
+- claro
+- profesional
+- cero presión comercial, salvo que el usuario la abra
+`;
+  }
+
+  if (agent === "scheduling") {
+    return `
+${base}
+
+Eres el AGENTE DE AGENDAMIENTO.
+
+Objetivos:
+- detectar si el usuario quiere demo, llamada o reunión
+- pedir nombre y WhatsApp si faltan
+- confirmar intención de agendar
+- sonar organizado, rápido y confiable
+
+Estilo:
+- ejecutivo
+- claro
+- orientado a cierre
 `;
   }
 
   return `
-Eres un asesor comercial y asistente virtual de una empresa de tecnología.
+${base}
 
-Tu función es:
-- ayudar a usuarios
-- resolver dudas
-- detectar oportunidades
-- convertir interesados en clientes
+Eres el AGENTE GENERAL / RECEPCIÓN.
 
-Servicios:
-- páginas web profesionales
-- chatbots
-- automatización
-- asistentes virtuales con IA
-- soluciones digitales para empresas, clínicas, hospitales y negocios
+Objetivos:
+- entender la intención inicial
+- orientar al usuario
+- responder dudas breves
+- encaminar la conversación al siguiente paso correcto
 
-PERSONALIDAD:
-- humano, claro y profesional
-- cercano pero confiable
-- directo, sin rodeos
-- adaptable según el tipo de usuario
-
-REGLAS:
-- nunca digas que eres una IA
-- responde en máximo 1–3 líneas
-- evita respuestas largas
-- no uses lenguaje técnico innecesario
-- siempre guía la conversación
-
-MODO INTELIGENTE:
-- si el usuario solo pregunta, ayuda sin presionar
-- si detectas interés comercial, guía a contacto
-- si es un sector sensible como salud, usa un tono más serio y respetuoso
-- si ya compartió datos, agradece y profundiza necesidad
-- si duda, genera confianza sin presionar
-
-OBJETIVO FINAL:
-Siempre que sea natural:
-- obtener nombre
-- obtener WhatsApp
-- entender necesidad
-- avanzar hacia cotización o contacto
-
-META:
-Ayudar primero.
-Adaptarse al usuario.
-Y convertir cuando sea el momento correcto.
+Estilo:
+- amable
+- profesional
+- natural
 `;
 }
 
+/**
+ * =========================================
+ * LEADS / ACCIONES
+ * =========================================
+ */
+
+async function getExistingLead(tenant, conversationId) {
+  return Lead.findOne({
+    tenantId: tenant.apiKey,
+    conversationId,
+  });
+}
+
+async function triggerWebhookIfNeeded(tenant, payload) {
+  const webhookUrl =
+    tenant?.config?.webhookUrl || process.env.DEFAULT_WEBHOOK_URL;
+
+  if (!webhookUrl) return { sent: false };
+
+  try {
+    await axios.post(webhookUrl, payload, {
+      timeout: 8000,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    return { sent: true };
+  } catch (error) {
+    console.error("Error enviando webhook:", error.message);
+    return { sent: false, error: error.message };
+  }
+}
+
+async function generateLeadSummary({
+  tenant,
+  conversationId,
+  messages,
+}) {
+  try {
+    const text = messages.slice(-6).join("\n");
+
+    const prompt = `
+Resume este lead en máximo 2 líneas.
+
+Incluye:
+- qué quiere el cliente
+- si pidió demo
+- tipo de servicio
+
+Conversación:
+${text}
+`;
+
+    const response = await axios.post(
+      "https://openrouter.ai/api/v1/chat/completions",
+      {
+        model: "openai/gpt-4o-mini",
+        messages: [
+          { role: "system", content: "Eres un asistente que resume leads." },
+          { role: "user", content: prompt },
+        ],
+        temperature: 0.4,
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    return (
+      response?.data?.choices?.[0]?.message?.content?.trim() || ""
+    );
+  } catch (err) {
+    console.error("Error generando summary:", err.message);
+    return "";
+  }
+}
+
+async function handleBusinessActions({
+  tenant,
+  conversationId,
+  message,
+  reply,
+  selectedAgent,
+  name,
+  phone,
+  interested,
+  requestedDemo,
+}) {
+  const existingLead = await getExistingLead(tenant, conversationId);
+
+  const finalName = name || existingLead?.name || null;
+  const finalPhone = phone || existingLead?.phone || null;
+  const finalInterested =
+    typeof interested === "boolean"
+      ? interested || Boolean(existingLead?.interested)
+      : Boolean(existingLead?.interested);
+
+  const finalRequestedDemo =
+    Boolean(requestedDemo) || Boolean(existingLead?.requestedDemo);
+
+  const shouldSave =
+    Boolean(finalName) ||
+    Boolean(finalPhone) ||
+    Boolean(finalInterested) ||
+    Boolean(finalRequestedDemo);
+
+  if (shouldSave) {
+    const updatedMessages = [
+      ...(existingLead?.messages || []),
+      `USER: ${message}`,
+      `BOT: ${reply}`,
+    ];
+
+    const summary = await generateLeadSummary({
+      tenant,
+      conversationId,
+      messages: updatedMessages,
+    });
+
+    await Lead.updateOne(
+      { tenantId: tenant.apiKey, conversationId },
+      {
+        $setOnInsert: {
+          tenantId: tenant.apiKey,
+          conversationId,
+          createdAt: new Date(),
+        },
+        $set: {
+          name: finalName,
+          phone: finalPhone,
+          interested: finalInterested,
+          requestedDemo: finalRequestedDemo,
+          selectedAgent,
+          summary,
+          updatedAt: new Date(),
+        },
+        $push: {
+          messages: {
+            $each: [`USER: ${message}`, `BOT: ${reply}`],
+          },
+        },
+      },
+      { upsert: true }
+    );
+  }
+
+  let webhookResult = { sent: false };
+
+  if (finalRequestedDemo || (finalInterested && finalPhone)) {
+    webhookResult = await triggerWebhookIfNeeded(tenant, {
+      type: finalRequestedDemo ? "demo_request" : "qualified_lead",
+      tenantId: tenant.apiKey,
+      conversationId,
+      selectedAgent,
+      name: finalName,
+      phone: finalPhone,
+      message,
+      reply,
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  return {
+    leadSaved: shouldSave,
+    webhookSent: webhookResult.sent,
+    mergedLead: {
+      name: finalName,
+      phone: finalPhone,
+      interested: finalInterested,
+      requestedDemo: finalRequestedDemo,
+    },
+  };
+}
+
+/**
+ * =========================================
+ * MODELO IA
+ * =========================================
+ */
+
+async function generateAIReply({
+  tenant,
+  selectedAgent,
+  message,
+  conversationId,
+  channel = "chat",
+}) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("Falta configurar OPENROUTER_API_KEY");
+  }
+
+  const systemPrompt = buildAgentPrompt(selectedAgent, tenant);
+  const history = getConversationHistory(conversationId);
+
+  const messages = [
+    {
+      role: "system",
+      content: `${systemPrompt}
+
+Canal actual: ${channel}
+Si el canal es voice, responde con frases aún más naturales y fáciles de decir en voz alta.
+`,
+    },
+    ...history,
+    { role: "user", content: message },
+  ];
+
+  const response = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model: "openai/gpt-4o-mini",
+      messages,
+      temperature: 0.7,
+    },
+    {
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+    }
+  );
+
+  const reply =
+    response?.data?.choices?.[0]?.message?.content?.trim() ||
+    "Hubo un problema al generar la respuesta.";
+
+  return reply;
+}
+
+/**
+ * =========================================
+ * RUTAS
+ * =========================================
+ */
+
 app.post("/chat", requireTenant, async (req, res) => {
   try {
-    const { message, conversationId } = req.body;
+    const { message, conversationId, channel = "chat" } = req.body;
     const tenant = req.tenant;
 
     if (!message || !message.trim()) {
@@ -248,64 +625,63 @@ app.post("/chat", requireTenant, async (req, res) => {
       return res.status(400).json({ error: "Falta conversationId" });
     }
 
-    if (!process.env.OPENROUTER_API_KEY) {
-      return res
-        .status(500)
-        .json({ error: "Falta configurar OPENROUTER_API_KEY" });
-    }
+    const selectedAgent = routeAgent(message);
 
-    const phone = extractPhone(message);
     const name = extractName(message);
+    const phone = extractPhone(message);
     const interested = detectInterest(message);
+    const requestedDemo = wantsDemo(message);
 
-    if (phone || name || interested) {
-      await Lead.updateOne(
-        { tenantId: tenant.apiKey, conversationId },
-        {
-          $setOnInsert: {
-            tenantId: tenant.apiKey,
-            conversationId,
-            createdAt: new Date(),
-          },
-          $set: {
-            name,
-            phone,
-            interested,
-            updatedAt: new Date(),
-          },
-          $addToSet: { messages: message },
-        },
-        { upsert: true }
-      );
-    }
+    const reply = await generateAIReply({
+      tenant,
+      selectedAgent,
+      message,
+      conversationId,
+      channel,
+    });
 
-    const systemPrompt = buildPromptByTenant(tenant);
+    appendConversationMessage(conversationId, "user", message);
+    appendConversationMessage(conversationId, "assistant", reply);
 
-    const response = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "openai/gpt-4o-mini",
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message },
-        ],
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const actions = await handleBusinessActions({
+      tenant,
+      conversationId,
+      message,
+      reply,
+      selectedAgent,
+      name,
+      phone,
+      interested,
+      requestedDemo,
+    });
 
-    const reply =
-      response?.data?.choices?.[0]?.message?.content ||
-      "Hubo un problema al generar la respuesta.";
-
-    return res.json({ reply });
+    return res.json({
+      reply,
+      ttsText: reply,
+      agent: selectedAgent,
+      actions,
+      memorySize: getConversationHistory(conversationId).length,
+    });
   } catch (error) {
     console.error("Error en /chat:", error.response?.data || error.message);
     return res.status(500).json({ error: "Error en IA" });
+  }
+});
+
+app.post("/chat/reset", requireTenant, async (req, res) => {
+  try {
+    const { conversationId } = req.body;
+
+    if (!conversationId) {
+      return res.status(400).json({ error: "Falta conversationId" });
+    }
+
+    clearConversationHistory(conversationId);
+
+    return res.json({ ok: true });
+  } catch (error) {
+    console.error("Error en /chat/reset:", error.message);
+    return res.status(500).json({ error: "No se pudo reiniciar la conversación" });
   }
 });
 
