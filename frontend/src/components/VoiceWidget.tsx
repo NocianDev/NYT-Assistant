@@ -276,6 +276,48 @@ export default function VoiceWidget({
     speakingRef.current = false;
   }
 
+  function hardStopEverything() {
+    try {
+      stopRecognition();
+      stopRecorder();
+      stopStream();
+      cleanupSpeech();
+      setIsBusy(false);
+      setVoiceState("idle");
+      busyRef.current = false;
+      speakingRef.current = false;
+    } catch (err) {
+      console.error("Error cerrando audio:", err);
+    }
+  }
+
+  useEffect(() => {
+    function handleVisibilityChange() {
+      if (document.hidden) {
+        hardStopEverything();
+        setCallActive(false);
+        callActiveRef.current = false;
+      }
+    }
+
+    function handlePageHide() {
+      hardStopEverything();
+      setCallActive(false);
+      callActiveRef.current = false;
+    }
+
+    window.addEventListener("pagehide", handlePageHide);
+    window.addEventListener("beforeunload", handlePageHide);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      window.removeEventListener("pagehide", handlePageHide);
+      window.removeEventListener("beforeunload", handlePageHide);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+      hardStopEverything();
+    };
+  }, []);
+
   function canRelisten() {
     if (stoppedRef.current) return false;
     if (!callActiveRef.current) return false;
@@ -309,16 +351,9 @@ export default function VoiceWidget({
   function endCall() {
     stoppedRef.current = true;
     callActiveRef.current = false;
-
-    stopRecognition();
-    stopRecorder();
-    stopStream();
-    cleanupSpeech();
-
-    setIsBusy(false);
+    hardStopEverything();
     setCallActive(false);
     setSeconds(0);
-    setVoiceState("idle");
     setTranscript("");
     setLastResponse("La llamada terminó.");
   }
@@ -787,7 +822,10 @@ export default function VoiceWidget({
             </div>
 
             <button
-              onClick={() => setIsOpen(false)}
+              onClick={() => {
+                endCall();
+                setIsOpen(false);
+              }}
               style={{
                 background: "rgba(255,255,255,0.45)",
                 border: "none",
