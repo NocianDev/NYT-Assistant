@@ -3,12 +3,15 @@ import cors from "cors";
 import dotenv from "dotenv";
 import axios from "axios";
 import mongoose from "mongoose";
+import multer from "multer";
+import { GoogleGenAI } from "@google/genai";
 import Lead from "./models/Lead.js";
 import Tenant from "./models/Tenant.js";
 
 dotenv.config();
 
 console.log("MONGODB_URI existe:", !!process.env.MONGODB_URI);
+console.log("GEMINI_API_KEY existe:", !!process.env.GEMINI_API_KEY);
 
 mongoose
   .connect(process.env.MONGODB_URI, {
@@ -19,6 +22,18 @@ mongoose
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Uploads en memoria para audio corto desde celular
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 12 * 1024 * 1024, // 12 MB
+  },
+});
+
+const gemini = process.env.GEMINI_API_KEY
+  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
+  : null;
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -175,8 +190,8 @@ async function requireTenant(req, res, next) {
   try {
     const tenantId =
       req.headers["x-tenant-id"] ||
-      req.body.tenantId ||
-      req.query.tenantId;
+      req.body?.tenantId ||
+      req.query?.tenantId;
 
     if (!tenantId) {
       return res.status(400).json({ error: "Falta tenantId" });
@@ -407,12 +422,10 @@ async function triggerWebhookIfNeeded(tenant, payload) {
   }
 }
 
-async function generateLeadSummary({
-  tenant,
-  conversationId,
-  messages,
-}) {
+async function generateLeadSummary({ messages }) {
   try {
+    if (!process.env.OPENROUTER_API_KEY) return "";
+
     const text = messages.slice(-6).join("\n");
 
     const prompt = `
@@ -445,9 +458,7 @@ ${text}
       }
     );
 
-    return (
-      response?.data?.choices?.[0]?.message?.content?.trim() || ""
-    );
+    return response?.data?.choices?.[0]?.message?.content?.trim() || "";
   } catch (err) {
     console.error("Error generando summary:", err.message);
     return "";
@@ -491,8 +502,6 @@ async function handleBusinessActions({
     ];
 
     const summary = await generateLeadSummary({
-      tenant,
-      conversationId,
       messages: updatedMessages,
     });
 
@@ -605,6 +614,68 @@ Si el canal es voice, responde con frases aún más naturales y fáciles de deci
 
   return reply;
 }
+
+/**
+ * =========================================
+ * AUDIO / CELULAR
+ * =========================================
+ */
+
+// Acepta el audio desde celular y lo manda a Gemini para transcribir
+app.post(
+  "/voice/transcribe",
+  upload.single("audio"),
+  requireTenant,
+  async (req, res) => {
+    try {
+      if (!gemini) {
+        return res
+          .status(500)
+          .json({ error: "Falta configurar GEMINI_API_KEY" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "No se envió audio" });
+      }
+
+      const mimeType = req.file.mimetype || "audio/webm";
+      const audioBase64 = req.file.buffer.toString("base64");
+
+      const response = await gemini.models.generateContent({
+        model: "gemini-2.5-flash",
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: "Transcribe este audio en español y devuelve únicamente el texto transcrito, sin explicaciones adicionales.",
+              },
+              {
+                inlineData: {
+                  mimeType,
+                  data: audioBase64,
+                },
+              },
+            ],
+          },
+        ],
+      });
+
+      const transcript = response.text?.trim();
+
+      if (!transcript) {
+        return res
+          .status(422)
+          .json({ error: "No se pudo transcribir el audio" });
+      }
+
+      return res.json({ transcript });
+    } catch (error) {
+      console.error("Error en /voice/transcribe:", error.message);
+      return res.status(500).json({ error: "Error transcribiendo audio" });
+    }
+  }
+);
 
 /**
  * =========================================
