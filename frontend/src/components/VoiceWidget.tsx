@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
 type VoiceState = "idle" | "listening" | "recording" | "thinking" | "speaking";
+type MicPermissionState = "unknown" | "prompt" | "granted" | "denied";
 
 type Props = {
   assistantName?: string;
@@ -10,6 +11,10 @@ declare global {
   interface Window {
     SpeechRecognition?: any;
     webkitSpeechRecognition?: any;
+  }
+
+  interface PermissionDescriptor {
+    name: PermissionName | "microphone";
   }
 }
 
@@ -113,6 +118,10 @@ export default function VoiceWidget({
   const [unsupported, setUnsupported] = useState(false);
   const [autoContinue, setAutoContinue] = useState(true);
 
+  const [micPermission, setMicPermission] =
+    useState<MicPermissionState>("unknown");
+  const [showPermissionScreen, setShowPermissionScreen] = useState(true);
+
   const recognitionRef = useRef<any>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -170,6 +179,46 @@ export default function VoiceWidget({
     return () => clearInterval(timer);
   }, [callActive]);
 
+  useEffect(() => {
+    let mounted = true;
+
+    async function checkPermission() {
+      try {
+        if (!navigator.permissions?.query) return;
+
+        const status = await navigator.permissions.query({
+          name: "microphone",
+        } as PermissionDescriptor);
+
+        if (!mounted) return;
+
+        const state = status.state as MicPermissionState;
+        setMicPermission(
+          state === "granted" || state === "denied" || state === "prompt"
+            ? state
+            : "unknown"
+        );
+
+        status.onchange = () => {
+          const next = status.state as MicPermissionState;
+          setMicPermission(
+            next === "granted" || next === "denied" || next === "prompt"
+              ? next
+              : "unknown"
+          );
+        };
+      } catch {
+        // En algunos navegadores móviles esto no está soportado del todo
+      }
+    }
+
+    checkPermission();
+
+    return () => {
+      mounted = false;
+    };
+  }, [isOpen]);
+
   function formatTime(totalSeconds: number) {
     const mins = String(Math.floor(totalSeconds / 60)).padStart(2, "0");
     const secs = String(totalSeconds % 60).padStart(2, "0");
@@ -180,9 +229,7 @@ export default function VoiceWidget({
     if (recognitionRef.current) {
       try {
         recognitionRef.current.stop();
-      } catch {
-        // ignore
-      }
+      } catch {}
       recognitionRef.current = null;
     }
   }
@@ -193,9 +240,7 @@ export default function VoiceWidget({
         if (recorderRef.current.state !== "inactive") {
           recorderRef.current.stop();
         }
-      } catch {
-        // ignore
-      }
+      } catch {}
       recorderRef.current = null;
     }
   }
@@ -413,6 +458,12 @@ export default function VoiceWidget({
     recognition.start();
   }
 
+  async function requestMicPermissionSilently() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    setMicPermission("granted");
+    return stream;
+  }
+
   async function startMobileRecording() {
     if (stoppedRef.current || !callActiveRef.current) return;
 
@@ -421,7 +472,7 @@ export default function VoiceWidget({
       stopStream();
       audioChunksRef.current = [];
 
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const stream = await requestMicPermissionSilently();
       streamRef.current = stream;
 
       let mimeType = "audio/webm";
@@ -435,7 +486,10 @@ export default function VoiceWidget({
         }
       }
 
-      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      const recorder = new MediaRecorder(
+        stream,
+        mimeType ? { mimeType } : undefined
+      );
       recorderRef.current = recorder;
 
       recorder.onstart = () => {
@@ -476,7 +530,6 @@ export default function VoiceWidget({
 
       recorder.start();
 
-      // turnos cortos para conversación continua
       setTimeout(() => {
         if (
           recorderRef.current &&
@@ -487,14 +540,53 @@ export default function VoiceWidget({
           recorderRef.current.stop();
         }
       }, 4000);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error al acceder al micrófono:", error);
+
+      if (error?.name === "NotAllowedError") {
+        setMicPermission("denied");
+        setLastResponse(
+          "El micrófono está bloqueado. Permítelo en la configuración del navegador."
+        );
+      } else if (error?.name === "NotFoundError") {
+        setLastResponse("No se encontró un micrófono disponible.");
+      } else {
+        setLastResponse("No se pudo acceder al micrófono.");
+      }
+
       setVoiceState("idle");
-      setLastResponse("No se pudo acceder al micrófono.");
+      setShowPermissionScreen(true);
+    }
+  }
+
+  async function activateMicrophone() {
+    try {
+      const stream = await requestMicPermissionSilently();
+      stopStream();
+      stream.getTracks().forEach((track) => track.stop());
+
+      setShowPermissionScreen(false);
+      setLastResponse("Micrófono activado. Ya puedes iniciar la llamada.");
+    } catch (error: any) {
+      console.error("Permiso de micrófono:", error);
+
+      if (error?.name === "NotAllowedError") {
+        setMicPermission("denied");
+        setLastResponse(
+          "El permiso fue bloqueado. Permítelo manualmente en el navegador para continuar."
+        );
+      } else {
+        setLastResponse("No se pudo activar el micrófono.");
+      }
     }
   }
 
   function startCall() {
+    if (unsupported) {
+      alert("Tu dispositivo no soporta esta experiencia de voz.");
+      return;
+    }
+
     stoppedRef.current = false;
     callActiveRef.current = true;
     setCallActive(true);
@@ -521,6 +613,11 @@ export default function VoiceWidget({
       : voiceState === "speaking"
       ? "linear-gradient(135deg, #facc15, #f59e0b)"
       : "linear-gradient(135deg, #e2e8f0, #cbd5e1)";
+
+  const permissionHelp =
+    micPermission === "denied"
+      ? "El acceso al micrófono está bloqueado. Abre la configuración del sitio y cámbialo a Permitir."
+      : "Para hablar con el asistente, activa el micrófono una sola vez.";
 
   return (
     <>
@@ -592,63 +689,53 @@ export default function VoiceWidget({
               overflowY: "auto",
             }}
           >
-            <div
-              style={{
-                fontSize: "28px",
-                fontWeight: 900,
-                color: "#0f172a",
-              }}
-            >
-              {formatTime(seconds)}
-            </div>
-
-            <div
-              style={{
-                width: "132px",
-                height: "132px",
-                borderRadius: "50%",
-                background: orbColor,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: "#111827",
-                fontSize: "40px",
-                fontWeight: 900,
-                boxShadow: "0 22px 45px rgba(15, 23, 42, 0.18)",
-                animation:
-                  callActive && voiceState !== "idle"
-                    ? "hmVoicePulse 1.8s ease-in-out infinite"
-                    : "none",
-              }}
-            >
-              AI
-            </div>
-
-            <StatusText state={voiceState} />
-            <VoiceBars active={callActive && voiceState !== "idle"} />
-
-            {unsupported ? (
+            {showPermissionScreen && !callActive ? (
               <div
                 style={{
                   width: "100%",
-                  background: "#fee2e2",
-                  color: "#991b1b",
-                  border: "1px solid #fecaca",
-                  borderRadius: "14px",
-                  padding: "12px 14px",
-                }}
-              >
-                Tu dispositivo no soporta esta experiencia de voz.
-              </div>
-            ) : (
-              <div
-                style={{
-                  width: "100%",
+                  alignSelf: "center",
                   display: "grid",
-                  gap: "12px",
-                  alignSelf: "start",
+                  gap: "16px",
                 }}
               >
+                <div
+                  style={{
+                    width: "116px",
+                    height: "116px",
+                    borderRadius: "50%",
+                    margin: "0 auto",
+                    background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: "36px",
+                    boxShadow: "0 18px 36px rgba(245, 158, 11, 0.24)",
+                  }}
+                >
+                  🎙️
+                </div>
+
+                <div>
+                  <div
+                    style={{
+                      fontSize: "26px",
+                      fontWeight: 900,
+                      color: "#0f172a",
+                      marginBottom: "10px",
+                    }}
+                  >
+                    Activa el micrófono
+                  </div>
+                  <div
+                    style={{
+                      color: "#475569",
+                      lineHeight: 1.7,
+                    }}
+                  >
+                    {permissionHelp}
+                  </div>
+                </div>
+
                 <div
                   style={{
                     background: "#ffffff",
@@ -656,91 +743,17 @@ export default function VoiceWidget({
                     borderRadius: "16px",
                     padding: "14px",
                     textAlign: "left",
+                    color: "#334155",
+                    lineHeight: 1.6,
                   }}
                 >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      color: "#64748b",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    Transcripción
-                  </div>
-                  <div
-                    style={{
-                      color: "#334155",
-                      lineHeight: 1.6,
-                      minHeight: "24px",
-                    }}
-                  >
-                    {transcript || "Aún no hay voz detectada."}
-                  </div>
+                  <strong>Consejo:</strong> abre esta página directamente en
+                  Chrome o Safari, no desde el navegador interno de WhatsApp,
+                  Instagram o Facebook.
                 </div>
 
-                <div
-                  style={{
-                    background: "#fff7cc",
-                    border: "1px solid rgba(250, 204, 21, 0.3)",
-                    borderRadius: "16px",
-                    padding: "14px",
-                    textAlign: "left",
-                  }}
-                >
-                  <div
-                    style={{
-                      fontSize: "12px",
-                      fontWeight: 800,
-                      color: "#92400e",
-                      marginBottom: "8px",
-                    }}
-                  >
-                    Respuesta
-                  </div>
-                  <div
-                    style={{
-                      color: "#334155",
-                      lineHeight: 1.6,
-                      minHeight: "24px",
-                    }}
-                  >
-                    {lastResponse}
-                  </div>
-                </div>
-              </div>
-            )}
-
-            <div
-              style={{
-                width: "100%",
-                display: "grid",
-                gap: "10px",
-                paddingBottom: "6px",
-              }}
-            >
-              <label
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  gap: "8px",
-                  fontSize: "13px",
-                  color: "#475569",
-                  fontWeight: 700,
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={autoContinue}
-                  onChange={(e) => setAutoContinue(e.target.checked)}
-                />
-                Conversación continua
-              </label>
-
-              {!callActive ? (
                 <button
-                  onClick={startCall}
+                  onClick={activateMicrophone}
                   style={{
                     border: "none",
                     borderRadius: "999px",
@@ -752,26 +765,211 @@ export default function VoiceWidget({
                     boxShadow: "0 14px 28px rgba(34, 197, 94, 0.22)",
                   }}
                 >
-                  Iniciar llamada
+                  Activar micrófono
                 </button>
-              ) : (
-                <button
-                  onClick={endCall}
+
+                {micPermission === "granted" && (
+                  <button
+                    onClick={startCall}
+                    style={{
+                      border: "none",
+                      borderRadius: "999px",
+                      padding: "14px 22px",
+                      background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                      color: "#111827",
+                      fontWeight: 800,
+                      cursor: "pointer",
+                      boxShadow: "0 14px 28px rgba(245, 158, 11, 0.22)",
+                    }}
+                  >
+                    Iniciar llamada
+                  </button>
+                )}
+              </div>
+            ) : (
+              <>
+                <div
                   style={{
-                    border: "none",
-                    borderRadius: "999px",
-                    padding: "14px 22px",
-                    background: "#ef4444",
-                    color: "#ffffff",
-                    fontWeight: 800,
-                    cursor: "pointer",
-                    boxShadow: "0 14px 28px rgba(239, 68, 68, 0.22)",
+                    fontSize: "28px",
+                    fontWeight: 900,
+                    color: "#0f172a",
                   }}
                 >
-                  Colgar
-                </button>
-              )}
-            </div>
+                  {formatTime(seconds)}
+                </div>
+
+                <div
+                  style={{
+                    width: "132px",
+                    height: "132px",
+                    borderRadius: "50%",
+                    background: orbColor,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    color: "#111827",
+                    fontSize: "40px",
+                    fontWeight: 900,
+                    boxShadow: "0 22px 45px rgba(15, 23, 42, 0.18)",
+                    animation:
+                      callActive && voiceState !== "idle"
+                        ? "hmVoicePulse 1.8s ease-in-out infinite"
+                        : "none",
+                  }}
+                >
+                  AI
+                </div>
+
+                <StatusText state={voiceState} />
+                <VoiceBars active={callActive && voiceState !== "idle"} />
+
+                {unsupported ? (
+                  <div
+                    style={{
+                      width: "100%",
+                      background: "#fee2e2",
+                      color: "#991b1b",
+                      border: "1px solid #fecaca",
+                      borderRadius: "14px",
+                      padding: "12px 14px",
+                    }}
+                  >
+                    Tu dispositivo no soporta esta experiencia de voz.
+                  </div>
+                ) : (
+                  <div
+                    style={{
+                      width: "100%",
+                      display: "grid",
+                      gap: "12px",
+                      alignSelf: "start",
+                    }}
+                  >
+                    <div
+                      style={{
+                        background: "#ffffff",
+                        border: "1px solid rgba(15, 23, 42, 0.06)",
+                        borderRadius: "16px",
+                        padding: "14px",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          color: "#64748b",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Transcripción
+                      </div>
+                      <div
+                        style={{
+                          color: "#334155",
+                          lineHeight: 1.6,
+                          minHeight: "24px",
+                        }}
+                      >
+                        {transcript || "Aún no hay voz detectada."}
+                      </div>
+                    </div>
+
+                    <div
+                      style={{
+                        background: "#fff7cc",
+                        border: "1px solid rgba(250, 204, 21, 0.3)",
+                        borderRadius: "16px",
+                        padding: "14px",
+                        textAlign: "left",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: "12px",
+                          fontWeight: 800,
+                          color: "#92400e",
+                          marginBottom: "8px",
+                        }}
+                      >
+                        Respuesta
+                      </div>
+                      <div
+                        style={{
+                          color: "#334155",
+                          lineHeight: 1.6,
+                          minHeight: "24px",
+                        }}
+                      >
+                        {lastResponse}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div
+                  style={{
+                    width: "100%",
+                    display: "grid",
+                    gap: "10px",
+                    paddingBottom: "6px",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      gap: "8px",
+                      fontSize: "13px",
+                      color: "#475569",
+                      fontWeight: 700,
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={autoContinue}
+                      onChange={(e) => setAutoContinue(e.target.checked)}
+                    />
+                    Conversación continua
+                  </label>
+
+                  {!callActive ? (
+                    <button
+                      onClick={startCall}
+                      style={{
+                        border: "none",
+                        borderRadius: "999px",
+                        padding: "14px 22px",
+                        background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                        color: "#ffffff",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: "0 14px 28px rgba(34, 197, 94, 0.22)",
+                      }}
+                    >
+                      Iniciar llamada
+                    </button>
+                  ) : (
+                    <button
+                      onClick={endCall}
+                      style={{
+                        border: "none",
+                        borderRadius: "999px",
+                        padding: "14px 22px",
+                        background: "#ef4444",
+                        color: "#ffffff",
+                        fontWeight: 800,
+                        cursor: "pointer",
+                        boxShadow: "0 14px 28px rgba(239, 68, 68, 0.22)",
+                      }}
+                    >
+                      Colgar
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
