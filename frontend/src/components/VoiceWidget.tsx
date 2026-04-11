@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 
-type VoiceState = "idle" | "listening" | "thinking" | "speaking";
+type VoiceState = "idle" | "listening" | "recording" | "thinking" | "speaking";
 
 type Props = {
   assistantName?: string;
@@ -70,8 +70,10 @@ function StatusText({ state }: { state: VoiceState }) {
     switch (state) {
       case "listening":
         return "Escuchando...";
+      case "recording":
+        return "Grabando...";
       case "thinking":
-        return "Pensando...";
+        return "Procesando...";
       case "speaking":
         return "Hablando...";
       default:
@@ -92,6 +94,11 @@ function StatusText({ state }: { state: VoiceState }) {
   );
 }
 
+function isMobileDevice() {
+  if (typeof navigator === "undefined") return false;
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 export default function VoiceWidget({
   assistantName = "HoyMismo Voice",
 }: Props) {
@@ -107,6 +114,10 @@ export default function VoiceWidget({
   const [autoContinue, setAutoContinue] = useState(true);
 
   const recognitionRef = useRef<any>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+
   const speakingRef = useRef(false);
   const stoppedRef = useRef(false);
   const callActiveRef = useRef(false);
@@ -115,6 +126,8 @@ export default function VoiceWidget({
   const conversationIdRef = useRef<string>(
     `voice-widget-${Date.now()}-${Math.random().toString(36).slice(2)}`
   );
+
+  const mobileModeRef = useRef<boolean>(false);
 
   useEffect(() => {
     const styleTag = document.createElement("style");
@@ -127,7 +140,14 @@ export default function VoiceWidget({
   }, []);
 
   useEffect(() => {
-    if (!SpeechRecognitionAPI) {
+    const mobile = isMobileDevice();
+    mobileModeRef.current = mobile;
+
+    if (!mobile && !SpeechRecognitionAPI) {
+      setUnsupported(true);
+    }
+
+    if (mobile && !navigator.mediaDevices?.getUserMedia) {
       setUnsupported(true);
     }
   }, []);
@@ -167,6 +187,26 @@ export default function VoiceWidget({
     }
   }
 
+  function stopRecorder() {
+    if (recorderRef.current) {
+      try {
+        if (recorderRef.current.state !== "inactive") {
+          recorderRef.current.stop();
+        }
+      } catch {
+        // ignore
+      }
+      recorderRef.current = null;
+    }
+  }
+
+  function stopStream() {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+  }
+
   function cleanupSpeech() {
     if ("speechSynthesis" in window) {
       window.speechSynthesis.cancel();
@@ -193,15 +233,24 @@ export default function VoiceWidget({
         setVoiceState("idle");
         return;
       }
-      startListening();
+
+      if (mobileModeRef.current) {
+        startMobileRecording();
+      } else {
+        startDesktopListening();
+      }
     }, delay);
   }
 
   function endCall() {
     stoppedRef.current = true;
     callActiveRef.current = false;
+
     stopRecognition();
+    stopRecorder();
+    stopStream();
     cleanupSpeech();
+
     setCallActive(false);
     setSeconds(0);
     setVoiceState("idle");
@@ -276,7 +325,48 @@ export default function VoiceWidget({
     }
   }
 
-  function startListening() {
+  async function transcribeAudioBlob(blob: Blob) {
+    try {
+      const apiUrl =
+        import.meta.env.VITE_API_URL?.replace(/\/+$/, "") ||
+        "http://localhost:3000";
+
+      const tenantId = import.meta.env.VITE_TENANT_ID;
+
+      const formData = new FormData();
+      formData.append("audio", blob, "voice-message.webm");
+      formData.append("tenantId", tenantId);
+
+      const res = await fetch(`${apiUrl}/voice/transcribe`, {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data?.error || "Error transcribiendo audio");
+      }
+
+      const text = data?.transcript?.trim() || "";
+      setTranscript(text);
+
+      if (!text) {
+        setVoiceState("idle");
+        scheduleRelisten(500);
+        return;
+      }
+
+      await sendVoiceTextToAssistant(text);
+    } catch (error: any) {
+      console.error(error);
+      setVoiceState("idle");
+      setLastResponse(error?.message || "No se pudo transcribir el audio.");
+      scheduleRelisten(900);
+    }
+  }
+
+  function startDesktopListening() {
     if (!SpeechRecognitionAPI || stoppedRef.current || !callActiveRef.current) {
       return;
     }
@@ -323,23 +413,108 @@ export default function VoiceWidget({
     recognition.start();
   }
 
-  function startCall() {
-    if (!SpeechRecognitionAPI) {
-      alert("Tu navegador no soporta reconocimiento de voz.");
-      return;
-    }
+  async function startMobileRecording() {
+    if (stoppedRef.current || !callActiveRef.current) return;
 
+    try {
+      stopRecorder();
+      stopStream();
+      audioChunksRef.current = [];
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+
+      let mimeType = "audio/webm";
+      if (typeof MediaRecorder !== "undefined") {
+        if (MediaRecorder.isTypeSupported?.("audio/webm;codecs=opus")) {
+          mimeType = "audio/webm;codecs=opus";
+        } else if (MediaRecorder.isTypeSupported?.("audio/mp4")) {
+          mimeType = "audio/mp4";
+        } else if (MediaRecorder.isTypeSupported?.("audio/webm")) {
+          mimeType = "audio/webm";
+        }
+      }
+
+      const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+      recorderRef.current = recorder;
+
+      recorder.onstart = () => {
+        setVoiceState("recording");
+      };
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      recorder.onstop = async () => {
+        const chunks = audioChunksRef.current;
+        audioChunksRef.current = [];
+
+        stopStream();
+
+        if (!chunks.length) {
+          setVoiceState("idle");
+          scheduleRelisten(700);
+          return;
+        }
+
+        const blob = new Blob(chunks, {
+          type: recorder.mimeType || "audio/webm",
+        });
+
+        await transcribeAudioBlob(blob);
+      };
+
+      recorder.onerror = (event: any) => {
+        console.error("MediaRecorder error:", event);
+        stopStream();
+        setVoiceState("idle");
+        scheduleRelisten(800);
+      };
+
+      recorder.start();
+
+      // turnos cortos para conversación continua
+      setTimeout(() => {
+        if (
+          recorderRef.current &&
+          recorderRef.current.state === "recording" &&
+          callActiveRef.current &&
+          !stoppedRef.current
+        ) {
+          recorderRef.current.stop();
+        }
+      }, 4000);
+    } catch (error) {
+      console.error("Error al acceder al micrófono:", error);
+      setVoiceState("idle");
+      setLastResponse("No se pudo acceder al micrófono.");
+    }
+  }
+
+  function startCall() {
     stoppedRef.current = false;
     callActiveRef.current = true;
     setCallActive(true);
     setSeconds(0);
     setTranscript("");
     setLastResponse("La llamada ha comenzado. Puedes hablar.");
-    startListening();
+
+    if (mobileModeRef.current) {
+      startMobileRecording();
+    } else {
+      if (!SpeechRecognitionAPI) {
+        alert("Tu navegador no soporta reconocimiento de voz.");
+        return;
+      }
+      startDesktopListening();
+    }
   }
 
   const orbColor =
-    voiceState === "listening"
+    voiceState === "listening" || voiceState === "recording"
       ? "linear-gradient(135deg, #22c55e, #16a34a)"
       : voiceState === "thinking"
       ? "linear-gradient(135deg, #60a5fa, #2563eb)"
@@ -463,7 +638,7 @@ export default function VoiceWidget({
                   padding: "12px 14px",
                 }}
               >
-                Tu navegador no soporta reconocimiento de voz. Prueba en Chrome o Edge.
+                Tu dispositivo no soporta esta experiencia de voz.
               </div>
             ) : (
               <div
