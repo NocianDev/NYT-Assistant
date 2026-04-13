@@ -34,6 +34,7 @@ const allowedOrigins = [
   "http://localhost:3000",
   "https://hoy-mismo-assitant.vercel.app",
   "https://hoymismo-assitant.vercel.app",
+  "https://nyt-assistant.vercel.app",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
