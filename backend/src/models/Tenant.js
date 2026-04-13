@@ -6,7 +6,7 @@ const tenantSchema = new mongoose.Schema({
   adminPassword: { type: String, required: true },
 
   config: {
-    primaryColor: { type: String, default: "#facc15" },
+    primaryColor: { type: String, default: "#dc2626" },
     welcomeMessage: { type: String, default: "Hola 👋 ¿En qué puedo ayudarte?" },
     tone: { type: String, default: "mixto" } // ventas | salud | mixto
   },

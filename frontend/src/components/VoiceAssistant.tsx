@@ -41,7 +41,7 @@ function VoiceBars({ active }: { active: boolean }) {
             width: "8px",
             height: `${18 + (i % 3) * 8}px`,
             borderRadius: "999px",
-            background: "linear-gradient(180deg, #facc15, #f59e0b)",
+            background: "linear-gradient(180deg, #dc2626, #991b1b)",
             transformOrigin: "bottom",
             animation: active
               ? `hmBars ${0.8 + i * 0.08}s ease-in-out infinite`
@@ -94,7 +94,7 @@ const SpeechRecognitionAPI =
     : null;
 
 export default function VoiceAssistant({
-  assistantName = "HoyMismo Assistant",
+  assistantName = "NYT Assistant",
   subtitle = "Experiencia de voz / llamada",
 }: Props) {
   const [voiceState, setVoiceState] = useState<VoiceState>("idle");
@@ -288,7 +288,7 @@ export default function VoiceAssistant({
       : voiceState === "thinking"
       ? "linear-gradient(135deg, #60a5fa, #2563eb)"
       : voiceState === "speaking"
-      ? "linear-gradient(135deg, #facc15, #f59e0b)"
+      ? "linear-gradient(135deg, #dc2626, #991b1b)"
       : "linear-gradient(135deg, #e2e8f0, #cbd5e1)";
 
   return (
@@ -316,9 +316,9 @@ export default function VoiceAssistant({
             style={{
               display: "inline-flex",
               alignItems: "center",
-              background: "rgba(250, 204, 21, 0.16)",
-              color: "#a16207",
-              border: "1px solid rgba(250, 204, 21, 0.35)",
+              background: "rgba(220, 38, 38, 0.14)",
+              color: "#ffffff",
+              border: "1px solid rgba(220, 38, 38, 0.35)",
               borderRadius: "999px",
               padding: "8px 14px",
               fontSize: "12px",
@@ -570,11 +570,11 @@ export default function VoiceAssistant({
                     border: "none",
                     borderRadius: "999px",
                     padding: "14px 22px",
-                    background: "linear-gradient(135deg, #facc15, #f59e0b)",
+                    background: "linear-gradient(135deg, #dc2626, #991b1b)",
                     color: "#111827",
                     fontWeight: 800,
                     cursor: "pointer",
-                    boxShadow: "0 14px 28px rgba(245, 158, 11, 0.22)",
+                    boxShadow: "0 14px 28px rgba(153, 27, 27, 0.28)",
                   }}
                 >
                   Hablar otra vez

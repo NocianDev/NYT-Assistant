@@ -182,9 +182,9 @@ export default function LeadsPanel() {
             style={{
               display: "inline-flex",
               alignItems: "center",
-              background: "rgba(250, 204, 21, 0.16)",
-              color: "#a16207",
-              border: "1px solid rgba(250, 204, 21, 0.35)",
+              background: "rgba(220, 38, 38, 0.14)",
+              color: "#ffffff",
+              border: "1px solid rgba(220, 38, 38, 0.35)",
               borderRadius: "999px",
               padding: "8px 14px",
               fontSize: "13px",
@@ -239,7 +239,7 @@ export default function LeadsPanel() {
               marginTop: "14px",
               padding: "14px",
               borderRadius: "14px",
-              background: "linear-gradient(135deg, #facc15, #f59e0b)",
+              background: "linear-gradient(135deg, #dc2626, #991b1b)",
               border: "none",
               fontWeight: 800,
               color: "#111827",
@@ -285,9 +285,9 @@ export default function LeadsPanel() {
               style={{
                 display: "inline-flex",
                 alignItems: "center",
-                background: "rgba(250, 204, 21, 0.16)",
-                color: "#a16207",
-                border: "1px solid rgba(250, 204, 21, 0.35)",
+                background: "rgba(220, 38, 38, 0.14)",
+                color: "#ffffff",
+                border: "1px solid rgba(220, 38, 38, 0.35)",
                 borderRadius: "999px",
                 padding: "7px 12px",
                 fontSize: "13px",
@@ -318,7 +318,7 @@ export default function LeadsPanel() {
             style={{
               padding: "12px 18px",
               borderRadius: "12px",
-              background: "linear-gradient(135deg, #facc15, #f59e0b)",
+              background: "linear-gradient(135deg, #dc2626, #991b1b)",
               border: "none",
               cursor: "pointer",
               fontWeight: 800,
@@ -436,7 +436,7 @@ export default function LeadsPanel() {
                   >
                     <span
                       style={{
-                        background: "rgba(250, 204, 21, 0.16)",
+                        background: "rgba(220, 38, 38, 0.14)",
                         color: "#92400e",
                         border: "1px solid rgba(250, 204, 21, 0.28)",
                         borderRadius: "999px",

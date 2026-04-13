@@ -10,9 +10,9 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  --brand-yellow: #facc15;
-  --brand-yellow-dark: #f59e0b;
-  --bg-soft: #fffdf5;
+  --brand-yellow: #dc2626;
+  --brand-yellow-dark: #991b1b;
+  --bg-soft: #0b0b0b;
   --bg-card: #ffffff;
   --text-main: #0f172a;
   --text-soft: #64748b;
@@ -36,7 +36,7 @@ html {
 }
 
 body {
-  background: linear-gradient(180deg, #fffdf5 0%, #fff9e6 35%, #ffffff 100%);
+  background: linear-gradient(180deg, #0b0b0b 0%, #111111 35%, #ffffff 100%);
   color: var(--text-main);
 }
 

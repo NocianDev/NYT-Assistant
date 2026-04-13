@@ -4,14 +4,13 @@ import dotenv from "dotenv";
 import axios from "axios";
 import mongoose from "mongoose";
 import multer from "multer";
-import { GoogleGenAI } from "@google/genai";
 import Lead from "./models/Lead.js";
 import Tenant from "./models/Tenant.js";
 
 dotenv.config();
 
 console.log("MONGODB_URI existe:", !!process.env.MONGODB_URI);
-console.log("GEMINI_API_KEY existe:", !!process.env.GEMINI_API_KEY);
+console.log("OPENROUTER_API_KEY existe:", !!process.env.OPENROUTER_API_KEY);
 
 mongoose
   .connect(process.env.MONGODB_URI, {
@@ -23,17 +22,12 @@ mongoose
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Uploads en memoria para audio corto desde celular
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 12 * 1024 * 1024, // 12 MB
+    fileSize: 12 * 1024 * 1024,
   },
 });
-
-const gemini = process.env.GEMINI_API_KEY
-  ? new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY })
-  : null;
 
 const allowedOrigins = [
   "http://localhost:5173",
@@ -61,7 +55,7 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "2mb" }));
 
 app.get("/", (req, res) => {
   res.send("Backend OK");
@@ -134,6 +128,7 @@ function detectInterest(text) {
     "demo",
     "agendar",
     "llamada",
+    "whatsapp",
   ].some((term) => lower.includes(term));
 }
 
@@ -155,6 +150,18 @@ function wantsDemo(text) {
 
 function normalizeText(text = "") {
   return text.trim().toLowerCase();
+}
+
+function normalizeAudioFormat(mimeType = "") {
+  const lower = mimeType.toLowerCase();
+
+  if (lower.includes("webm")) return "webm";
+  if (lower.includes("wav")) return "wav";
+  if (lower.includes("mpeg") || lower.includes("mp3")) return "mp3";
+  if (lower.includes("mp4") || lower.includes("m4a")) return "mp4";
+  if (lower.includes("ogg")) return "ogg";
+
+  return "webm";
 }
 
 /**
@@ -390,6 +397,40 @@ Estilo:
 
 /**
  * =========================================
+ * OPENROUTER
+ * =========================================
+ */
+
+async function openRouterChat({ model, messages, temperature = 0.7 }) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    throw new Error("Falta configurar OPENROUTER_API_KEY");
+  }
+
+  const response = await axios.post(
+    "https://openrouter.ai/api/v1/chat/completions",
+    {
+      model,
+      messages,
+      temperature,
+    },
+    {
+      timeout: 60000,
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        "Content-Type": "application/json",
+        ...(process.env.FRONTEND_URL
+          ? { "HTTP-Referer": process.env.FRONTEND_URL }
+          : {}),
+        "X-Title": process.env.APP_NAME || "NYT Assistant",
+      },
+    }
+  );
+
+  return response?.data;
+}
+
+/**
+ * =========================================
  * LEADS / ACCIONES
  * =========================================
  */
@@ -424,8 +465,6 @@ async function triggerWebhookIfNeeded(tenant, payload) {
 
 async function generateLeadSummary({ messages }) {
   try {
-    if (!process.env.OPENROUTER_API_KEY) return "";
-
     const text = messages.slice(-6).join("\n");
 
     const prompt = `
@@ -440,25 +479,16 @@ Conversación:
 ${text}
 `;
 
-    const response = await axios.post(
-      "https://openrouter.ai/api/v1/chat/completions",
-      {
-        model: "openai/gpt-4o-mini",
-        messages: [
-          { role: "system", content: "Eres un asistente que resume leads." },
-          { role: "user", content: prompt },
-        ],
-        temperature: 0.4,
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+    const data = await openRouterChat({
+      model: process.env.OPENROUTER_TEXT_MODEL || "openai/gpt-4o-mini",
+      messages: [
+        { role: "system", content: "Eres un asistente que resume leads." },
+        { role: "user", content: prompt },
+      ],
+      temperature: 0.4,
+    });
 
-    return response?.data?.choices?.[0]?.message?.content?.trim() || "";
+    return data?.choices?.[0]?.message?.content?.trim() || "";
   } catch (err) {
     console.error("Error generando summary:", err.message);
     return "";
@@ -573,10 +603,6 @@ async function generateAIReply({
   conversationId,
   channel = "chat",
 }) {
-  if (!process.env.OPENROUTER_API_KEY) {
-    throw new Error("Falta configurar OPENROUTER_API_KEY");
-  }
-
   const systemPrompt = buildAgentPrompt(selectedAgent, tenant);
   const history = getConversationHistory(conversationId);
 
@@ -586,30 +612,21 @@ async function generateAIReply({
       content: `${systemPrompt}
 
 Canal actual: ${channel}
-Si el canal es voice, responde con frases aún más naturales y fáciles de decir en voz alta.
+Si el canal es voice, responde con frases aún más naturales, fáciles de decir y no demasiado largas.
 `,
     },
     ...history,
     { role: "user", content: message },
   ];
 
-  const response = await axios.post(
-    "https://openrouter.ai/api/v1/chat/completions",
-    {
-      model: "openai/gpt-4o-mini",
-      messages,
-      temperature: 0.7,
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-    }
-  );
+  const data = await openRouterChat({
+    model: process.env.OPENROUTER_TEXT_MODEL || "openai/gpt-4o-mini",
+    messages,
+    temperature: 0.7,
+  });
 
   const reply =
-    response?.data?.choices?.[0]?.message?.content?.trim() ||
+    data?.choices?.[0]?.message?.content?.trim() ||
     "Hubo un problema al generar la respuesta.";
 
   return reply;
@@ -617,43 +634,42 @@ Si el canal es voice, responde con frases aún más naturales y fáciles de deci
 
 /**
  * =========================================
- * AUDIO / CELULAR
+ * AUDIO / TRANSCRIPCIÓN CON OPENROUTER
  * =========================================
  */
 
-// Acepta el audio desde celular y lo manda a Gemini para transcribir
 app.post(
   "/voice/transcribe",
   upload.single("audio"),
   requireTenant,
   async (req, res) => {
     try {
-      if (!gemini) {
-        return res
-          .status(500)
-          .json({ error: "Falta configurar GEMINI_API_KEY" });
-      }
-
       if (!req.file) {
         return res.status(400).json({ error: "No se envió audio" });
       }
 
-      const mimeType = req.file.mimetype || "audio/webm";
+      const format = normalizeAudioFormat(req.file.mimetype);
       const audioBase64 = req.file.buffer.toString("base64");
 
-      const response = await gemini.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
+      const data = await openRouterChat({
+        model:
+          process.env.OPENROUTER_AUDIO_MODEL ||
+          "openai/gpt-4o-audio-preview",
+        temperature: 0,
+        messages: [
           {
             role: "user",
-            parts: [
+            content: [
               {
-                text: "Transcribe este audio en español y devuelve únicamente el texto transcrito, sin explicaciones adicionales.",
+                type: "text",
+                text:
+                  "Transcribe este audio en español de México. Devuelve únicamente el texto transcrito, sin comillas ni explicaciones.",
               },
               {
-                inlineData: {
-                  mimeType,
+                type: "input_audio",
+                input_audio: {
                   data: audioBase64,
+                  format,
                 },
               },
             ],
@@ -661,7 +677,10 @@ app.post(
         ],
       });
 
-      const transcript = response.text?.trim();
+      const transcript =
+        data?.choices?.[0]?.message?.content?.trim() ||
+        data?.choices?.[0]?.message?.audio?.transcript?.trim() ||
+        "";
 
       if (!transcript) {
         return res
@@ -671,8 +690,13 @@ app.post(
 
       return res.json({ transcript });
     } catch (error) {
-      console.error("Error en /voice/transcribe:", error.message);
-      return res.status(500).json({ error: "Error transcribiendo audio" });
+      console.error(
+        "Error en /voice/transcribe:",
+        error.response?.data || error.message
+      );
+      return res.status(500).json({
+        error: "Error transcribiendo audio con OpenRouter",
+      });
     }
   }
 );

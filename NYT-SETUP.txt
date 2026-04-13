@@ -1,0 +1,53 @@
+NYT Assistant - pasos de instalación y configuración
+
+1) Frontend
+- Entra a /frontend
+- Ejecuta: npm install
+- Ejecuta: npm run dev
+
+2) Backend
+- Entra a /backend
+- Ejecuta: npm install
+- Ejecuta: npm start
+
+3) Variables de entorno
+Frontend (.env)
+VITE_API_URL=http://localhost:3000
+VITE_TENANT_ID=nyt_demo_1
+
+Backend (.env)
+PORT=3000
+FRONTEND_URL=http://localhost:5173
+MONGODB_URI=mongodb+srv://TU_USUARIO:TU_PASSWORD@TU_CLUSTER.mongodb.net/nytassistant?retryWrites=true&w=majority&appName=Cluster0
+GEMINI_API_KEY=PEGA_AQUI_TU_API_KEY
+ADMIN_PASSWORD=pon_una_clave_segura
+
+4) MongoDB
+- Crea un proyecto nuevo en MongoDB Atlas
+- Crea un cluster nuevo o usa uno tuyo
+- En Database Access crea tu usuario y contraseña
+- En Network Access agrega tu IP actual o 0.0.0.0/0 temporalmente
+- La base puede llamarse: nytassistant
+- Crea una colección llamada: tenants
+- Inserta este documento:
+
+{
+  "name": "NYT",
+  "apiKey": "nyt_demo_1",
+  "adminPassword": "pon_una_clave_segura",
+  "config": {
+    "primaryColor": "#dc2626",
+    "welcomeMessage": "Hola 👋 Soy NYT Assistant. Estoy listo para ayudarte.",
+    "tone": "ventas"
+  }
+}
+
+5) Importante
+- El frontend usa VITE_TENANT_ID y debe coincidir exactamente con tenants.apiKey
+- El panel de leads usa x-admin-password y debe coincidir con adminPassword del tenant
+- Si cambias apiKey o adminPassword en Mongo, cambia también el frontend o tu panel dejará de entrar
+
+6) Limpieza recomendada
+- Borra node_modules en frontend y backend si el proyecto fue copiado de otra máquina
+- Luego vuelve a correr npm install en ambos
+- Cambia cualquier API key o password vieja si el zip tenía datos reales

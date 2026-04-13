@@ -31,10 +31,10 @@ const API_URL =
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
 
 export default function AssistantWidget({
-  title = "HoyMismo Assistant",
-  welcomeMessage = "Hola 👋 Soy HoyMismo Assistant. Estoy listo para ayudarte.",
+  title = "NYT Assistant",
+  welcomeMessage = "Hola 👋 Soy NYT Assistant. Estoy listo para ayudarte con información, cotizaciones y atención para tu negocio.",
   apiUrl = `${API_URL}/chat`,
-  primaryColor = "#facc15",
+  primaryColor = "#dc2626",
 }: Props) {
   const [isOpen, setIsOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -126,10 +126,10 @@ export default function AssistantWidget({
   }
 
   const quickReplies = [
-    "Quiero una página web",
-    "Necesito automatizar WhatsApp",
-    "¿Manejan asistentes con IA?",
-    "Quiero información de precios",
+    "Quiero una cotización",
+    "Necesito un asistente para mi negocio",
+    "¿Pueden automatizar WhatsApp?",
+    "Quiero una demo",
   ];
 
   return (
@@ -155,7 +155,7 @@ export default function AssistantWidget({
           <div
             style={{
               padding: "16px 18px",
-              background: `linear-gradient(135deg, ${primaryColor}, #f59e0b)`,
+              background: `linear-gradient(135deg, ${primaryColor}, #991b1b)`,
               color: "#111827",
               display: "flex",
               alignItems: "center",
@@ -364,7 +364,7 @@ export default function AssistantWidget({
           width: "64px",
           height: "64px",
           borderRadius: "50%",
-          background: `linear-gradient(135deg, ${primaryColor}, #f59e0b)`,
+          background: `linear-gradient(135deg, ${primaryColor}, #991b1b)`,
           border: "none",
           fontSize: "24px",
           cursor: "pointer",
