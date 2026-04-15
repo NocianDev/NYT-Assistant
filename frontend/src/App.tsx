@@ -4,6 +4,7 @@ import AssistantWidget from "./components/AssistantWidget";
 import LeadsPanel from "./components/LeadsPanel";
 import VoiceAssistant from "./components/VoiceAssistant";
 import VoiceWidget from "./components/VoiceWidget";
+import AssistantsHub from "./pages/AssistantsHub";
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
@@ -839,7 +840,7 @@ function HomePage() {
         apiUrl={`${API_URL}/chat`}
       />
 
-      <VoiceWidget assistantName="NYT Voice" />
+      <VoiceWidget />
     </div>
   );
 }
@@ -850,6 +851,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/admin" element={<LeadsPanel />} />
+        <Route path="/assistants" element={<AssistantsHub />} />
       </Routes>
     </BrowserRouter>
   );
