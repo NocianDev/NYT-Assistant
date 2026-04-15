@@ -156,6 +156,9 @@ export default function VoiceWidgetPanel({
   const relistenTimerRef = useRef<number | null>(null);
   const hasStartedRef = useRef(false);
 
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const audioUrlRef = useRef<string | null>(null);
+
   const conversationIdRef = useRef<string>(
     `voice-widget-${assistantId}-${Date.now()}-${Math.random()
       .toString(36)
@@ -276,15 +279,15 @@ export default function VoiceWidgetPanel({
   }
 
   function stopRecorder() {
-  if (recorderRef.current) {
-    try {
-      if (recorderRef.current.state !== "inactive") {
-        recorderRef.current.stop();
-      }
-    } catch {}
-    recorderRef.current = null;
+    if (recorderRef.current) {
+      try {
+        if (recorderRef.current.state !== "inactive") {
+          recorderRef.current.stop();
+        }
+      } catch {}
+      recorderRef.current = null;
+    }
   }
-}
 
   function stopStream() {
     if (streamRef.current) {
@@ -294,9 +297,19 @@ export default function VoiceWidgetPanel({
   }
 
   function cleanupSpeech() {
-    if ("speechSynthesis" in window) {
-      window.speechSynthesis.cancel();
+    try {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current.currentTime = 0;
+      }
+    } catch {}
+
+    if (audioUrlRef.current) {
+      URL.revokeObjectURL(audioUrlRef.current);
+      audioUrlRef.current = null;
     }
+
+    audioElementRef.current = null;
     speakingRef.current = false;
   }
 
@@ -427,34 +440,72 @@ export default function VoiceWidgetPanel({
     }
   }
 
-  function speakText(text: string) {
-    return new Promise<void>((resolve) => {
-      if (!("speechSynthesis" in window)) {
-        resolve();
-        return;
+  async function speakText(text: string) {
+    if (!text?.trim()) return;
+
+    const apiUrl =
+      import.meta.env.VITE_API_URL?.replace(/\/+$/, "") ||
+      "http://localhost:3000";
+
+    const tenantId = import.meta.env.VITE_TENANT_ID;
+    const clientType = isMobileDevice() ? "mobile" : "desktop";
+
+    speakingRef.current = true;
+    setVoiceState("speaking");
+
+    try {
+      if (audioElementRef.current) {
+        try {
+          audioElementRef.current.pause();
+          audioElementRef.current.currentTime = 0;
+        } catch {}
       }
 
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = "es-MX";
-      utterance.rate = 1;
-      utterance.pitch = 1;
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
 
-      speakingRef.current = true;
-      setVoiceState("speaking");
+      const response = await fetch(`${apiUrl}/voice/speak`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-tenant-id": tenantId || "",
+          "x-client-type": clientType,
+        },
+        body: JSON.stringify({
+          text,
+          tenantId,
+          assistantId: activeAssistantId,
+          clientType,
+        }),
+      });
 
-      utterance.onend = () => {
-        speakingRef.current = false;
-        resolve();
-      };
+      if (!response.ok) {
+        throw new Error(`Error /voice/speak (${response.status})`);
+      }
 
-      utterance.onerror = () => {
-        speakingRef.current = false;
-        resolve();
-      };
+      const audioBlob = await response.blob();
+      const audioUrl = URL.createObjectURL(audioBlob);
+      audioUrlRef.current = audioUrl;
 
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(utterance);
-    });
+      const audio = new Audio(audioUrl);
+      audioElementRef.current = audio;
+
+      await new Promise<void>((resolve, reject) => {
+        audio.onended = () => resolve();
+        audio.onerror = () =>
+          reject(new Error("No se pudo reproducir el audio."));
+        audio.play().catch(reject);
+      });
+    } finally {
+      if (audioUrlRef.current) {
+        URL.revokeObjectURL(audioUrlRef.current);
+        audioUrlRef.current = null;
+      }
+      audioElementRef.current = null;
+      speakingRef.current = false;
+    }
   }
 
   async function sendVoiceTextToAssistant(text: string) {
@@ -471,7 +522,6 @@ export default function VoiceWidgetPanel({
         "http://localhost:3000";
 
       const tenantId = import.meta.env.VITE_TENANT_ID;
-
       const clientType = isMobileDevice() ? "mobile" : "desktop";
 
       const { res, data } = await safeFetchJson(
