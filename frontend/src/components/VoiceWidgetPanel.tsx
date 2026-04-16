@@ -142,6 +142,10 @@ export default function VoiceWidgetPanel({
   const [transitionText, setTransitionText] = useState("");
   const [isSwitchingAssistant, setIsSwitchingAssistant] = useState(false);
 
+  const [isMobileLayout, setIsMobileLayout] = useState(
+    typeof window !== "undefined" ? window.innerWidth < 900 : false
+  );
+
   const recognitionRef = useRef<any>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -188,6 +192,15 @@ export default function VoiceWidgetPanel({
     if (mobile && !navigator.mediaDevices?.getUserMedia) {
       setUnsupported(true);
     }
+  }, []);
+
+  useEffect(() => {
+    function handleResize() {
+      setIsMobileLayout(window.innerWidth < 900);
+    }
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
   }, []);
 
   useEffect(() => {
@@ -574,7 +587,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(1200);
+        scheduleRelisten(isMobileDevice() ? 1800 : 1200);
       } else {
         setVoiceState("idle");
       }
@@ -600,7 +613,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(1500);
+        scheduleRelisten(isMobileDevice() ? 2000 : 1500);
       }
     }
   }
@@ -640,11 +653,13 @@ export default function VoiceWidgetPanel({
           },
           body: formData,
         },
-        40000
+        50000
       );
 
       if (!res.ok) {
-        throw new Error(data?.error || `Error /voice/transcribe (${res.status})`);
+        throw new Error(
+          data?.error || `Error /voice/transcribe (${res.status})`
+        );
       }
 
       const text = data?.transcript?.trim() || "";
@@ -660,7 +675,7 @@ export default function VoiceWidgetPanel({
           autoContinueRef.current &&
           !stoppedRef.current
         ) {
-          scheduleRelisten(1000);
+          scheduleRelisten(isMobileDevice() ? 1400 : 1000);
         }
         return;
       }
@@ -681,7 +696,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(1500);
+        scheduleRelisten(isMobileDevice() ? 2200 : 1500);
       }
     }
   }
@@ -731,7 +746,7 @@ export default function VoiceWidgetPanel({
           autoContinueRef.current &&
           !stoppedRef.current
         ) {
-          scheduleRelisten(1000);
+          scheduleRelisten(1100);
         }
         return;
       }
@@ -753,7 +768,7 @@ export default function VoiceWidgetPanel({
         !busyRef.current &&
         !speakingRef.current
       ) {
-        scheduleRelisten(700);
+        scheduleRelisten(900);
         return;
       }
 
@@ -834,7 +849,7 @@ export default function VoiceWidgetPanel({
 
         if (!chunks.length) {
           setVoiceState("idle");
-          scheduleRelisten(1200);
+          scheduleRelisten(1400);
           return;
         }
 
@@ -850,10 +865,12 @@ export default function VoiceWidgetPanel({
         stopStream();
         setVoiceState("idle");
         setLastResponse("El navegador falló al grabar el audio.");
-        scheduleRelisten(1400);
+        scheduleRelisten(1800);
       };
 
       recorder.start();
+
+      const recordDuration = isMobileLayout ? 8000 : 6500;
 
       window.setTimeout(() => {
         if (
@@ -864,7 +881,7 @@ export default function VoiceWidgetPanel({
         ) {
           recorderRef.current.stop();
         }
-      }, 5000);
+      }, recordDuration);
     } catch (error: any) {
       console.error("Error al acceder al micrófono:", error);
 
@@ -942,38 +959,50 @@ export default function VoiceWidgetPanel({
     .slice(0, 2)
     .toUpperCase();
 
+  const outerGap = isMobileLayout ? "14px" : "20px";
+  const mainGridColumns = isMobileLayout
+    ? "1fr"
+    : "minmax(320px, 1.1fr) minmax(320px, 0.9fr)";
+  const mainCardPadding = isMobileLayout ? "20px" : "28px";
+  const mainCardMinHeight = isMobileLayout ? "auto" : "560px";
+  const orbSize = isMobileLayout ? 124 : 172;
+  const orbFontSize = isMobileLayout ? "30px" : "42px";
+  const titleFontSize = isMobileLayout ? "26px" : "32px";
+  const timerFontSize = isMobileLayout ? "24px" : "28px";
+  const buttonWidth = isMobileLayout ? "100%" : "auto";
+
   return (
     <div
       style={{
         width: "100%",
         display: "grid",
-        gap: "20px",
+        gap: outerGap,
       }}
     >
       <div
         style={{
           display: "grid",
-          gridTemplateColumns: "minmax(320px, 1.1fr) minmax(320px, 0.9fr)",
-          gap: "20px",
+          gridTemplateColumns: mainGridColumns,
+          gap: outerGap,
         }}
       >
         <div
           style={{
             background: "rgba(255,255,255,0.06)",
-            borderRadius: "28px",
+            borderRadius: isMobileLayout ? "22px" : "28px",
             border: "1px solid rgba(255,255,255,0.08)",
-            minHeight: "560px",
-            padding: "28px",
+            minHeight: mainCardMinHeight,
+            padding: mainCardPadding,
             display: "grid",
             placeItems: "center",
             textAlign: "center",
             backdropFilter: "blur(16px)",
           }}
         >
-          <div style={{ width: "100%", maxWidth: "420px" }}>
+          <div style={{ width: "100%", maxWidth: isMobileLayout ? "100%" : "420px" }}>
             <div
               style={{
-                fontSize: "14px",
+                fontSize: "13px",
                 fontWeight: 800,
                 color: activeAssistantColor,
                 textTransform: "uppercase",
@@ -986,10 +1015,11 @@ export default function VoiceWidgetPanel({
 
             <div
               style={{
-                fontSize: "32px",
+                fontSize: titleFontSize,
                 fontWeight: 900,
                 color: "#ffffff",
                 marginBottom: "10px",
+                lineHeight: 1.05,
               }}
             >
               {activeAssistantName}
@@ -997,10 +1027,10 @@ export default function VoiceWidgetPanel({
 
             <div
               style={{
-                fontSize: "28px",
+                fontSize: timerFontSize,
                 fontWeight: 900,
                 color: "#ffffff",
-                marginBottom: "22px",
+                marginBottom: "18px",
               }}
             >
               {formatTime(seconds)}
@@ -1008,22 +1038,22 @@ export default function VoiceWidgetPanel({
 
             <div
               style={{
-                width: "172px",
-                height: "172px",
+                width: `${orbSize}px`,
+                height: `${orbSize}px`,
                 borderRadius: "50%",
                 background: orbColor,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 color: "#111827",
-                fontSize: "42px",
+                fontSize: orbFontSize,
                 fontWeight: 900,
                 boxShadow: "0 22px 45px rgba(15, 23, 42, 0.24)",
                 animation:
                   callActive && voiceState !== "idle"
                     ? "hmVoicePulse 1.8s ease-in-out infinite"
                     : "none",
-                margin: "0 auto 18px",
+                margin: "0 auto 16px",
                 transition: "all 0.35s ease",
               }}
             >
@@ -1031,14 +1061,14 @@ export default function VoiceWidgetPanel({
             </div>
 
             <StatusText state={voiceState} />
-            <div style={{ marginTop: "16px" }}>
+            <div style={{ marginTop: "14px" }}>
               <VoiceBars active={callActive && voiceState !== "idle"} />
             </div>
 
             {transitionText && (
               <div
                 style={{
-                  marginTop: "18px",
+                  marginTop: "16px",
                   padding: "12px 14px",
                   borderRadius: "16px",
                   background: "rgba(255,255,255,0.08)",
@@ -1046,6 +1076,7 @@ export default function VoiceWidgetPanel({
                   color: "#f8fafc",
                   lineHeight: 1.6,
                   fontSize: "14px",
+                  textAlign: "left",
                 }}
               >
                 {transitionText}
@@ -1057,7 +1088,7 @@ export default function VoiceWidgetPanel({
         <div
           style={{
             display: "grid",
-            gap: "16px",
+            gap: isMobileLayout ? "12px" : "16px",
             alignContent: "start",
           }}
         >
@@ -1065,23 +1096,23 @@ export default function VoiceWidgetPanel({
             <div
               style={{
                 background: "rgba(255,255,255,0.06)",
-                borderRadius: "28px",
+                borderRadius: isMobileLayout ? "22px" : "28px",
                 border: "1px solid rgba(255,255,255,0.08)",
-                padding: "24px",
+                padding: isMobileLayout ? "18px" : "24px",
                 display: "grid",
-                gap: "16px",
+                gap: "14px",
                 backdropFilter: "blur(16px)",
               }}
             >
               <div
                 style={{
-                  width: "74px",
-                  height: "74px",
+                  width: "68px",
+                  height: "68px",
                   borderRadius: "999px",
                   background: "linear-gradient(135deg, #facc15, #f59e0b)",
                   display: "grid",
                   placeItems: "center",
-                  fontSize: "34px",
+                  fontSize: "30px",
                   boxShadow: "0 18px 36px rgba(245, 158, 11, 0.24)",
                 }}
               >
@@ -1091,10 +1122,11 @@ export default function VoiceWidgetPanel({
               <div>
                 <div
                   style={{
-                    fontSize: "28px",
+                    fontSize: isMobileLayout ? "24px" : "28px",
                     fontWeight: 900,
                     color: "#ffffff",
                     marginBottom: "10px",
+                    lineHeight: 1.05,
                   }}
                 >
                   Activa el micrófono
@@ -1104,6 +1136,7 @@ export default function VoiceWidgetPanel({
                   style={{
                     color: "rgba(255,255,255,0.76)",
                     lineHeight: 1.7,
+                    fontSize: isMobileLayout ? "14px" : "15px",
                   }}
                 >
                   {permissionHelp}
@@ -1119,15 +1152,18 @@ export default function VoiceWidgetPanel({
                   textAlign: "left",
                   color: "#e2e8f0",
                   lineHeight: 1.6,
+                  fontSize: "14px",
                 }}
               >
-                <strong>Consejo:</strong> usa audífonos o mantén el volumen bajo
-                si activas conversación continua.
+                <strong>Consejo:</strong> en celular habla cerca del micrófono,
+                espera medio segundo antes de empezar y usa audífonos si dejas la
+                conversación continua encendida.
               </div>
 
               <button
                 onClick={activateMicrophone}
                 style={{
+                  width: buttonWidth,
                   border: "none",
                   borderRadius: "999px",
                   padding: "14px 22px",
@@ -1145,6 +1181,7 @@ export default function VoiceWidgetPanel({
                 <button
                   onClick={startCall}
                   style={{
+                    width: buttonWidth,
                     border: "none",
                     borderRadius: "999px",
                     padding: "14px 22px",
@@ -1181,7 +1218,7 @@ export default function VoiceWidgetPanel({
                       background: "rgba(255,255,255,0.06)",
                       border: "1px solid rgba(255,255,255,0.08)",
                       borderRadius: "20px",
-                      padding: "16px",
+                      padding: isMobileLayout ? "14px" : "16px",
                       textAlign: "left",
                     }}
                   >
@@ -1202,7 +1239,9 @@ export default function VoiceWidgetPanel({
                       style={{
                         color: "#e2e8f0",
                         lineHeight: 1.7,
-                        minHeight: "78px",
+                        minHeight: isMobileLayout ? "56px" : "78px",
+                        fontSize: isMobileLayout ? "14px" : "15px",
+                        wordBreak: "break-word",
                       }}
                     >
                       {transcript || "Aún no hay voz detectada."}
@@ -1214,7 +1253,7 @@ export default function VoiceWidgetPanel({
                       background: "rgba(250, 204, 21, 0.08)",
                       border: "1px solid rgba(250, 204, 21, 0.2)",
                       borderRadius: "20px",
-                      padding: "16px",
+                      padding: isMobileLayout ? "14px" : "16px",
                       textAlign: "left",
                     }}
                   >
@@ -1235,7 +1274,9 @@ export default function VoiceWidgetPanel({
                       style={{
                         color: "#f8fafc",
                         lineHeight: 1.7,
-                        minHeight: "78px",
+                        minHeight: isMobileLayout ? "56px" : "78px",
+                        fontSize: isMobileLayout ? "14px" : "15px",
+                        wordBreak: "break-word",
                       }}
                     >
                       {lastResponse}
@@ -1250,7 +1291,7 @@ export default function VoiceWidgetPanel({
                       background: "rgba(255,255,255,0.06)",
                       border: "1px solid rgba(255,255,255,0.08)",
                       borderRadius: "20px",
-                      padding: "16px",
+                      padding: isMobileLayout ? "14px" : "16px",
                     }}
                   >
                     <label
@@ -1276,6 +1317,7 @@ export default function VoiceWidgetPanel({
                         onClick={startCall}
                         disabled={isBusy}
                         style={{
+                          width: buttonWidth,
                           border: "none",
                           borderRadius: "999px",
                           padding: "14px 22px",
@@ -1293,6 +1335,7 @@ export default function VoiceWidgetPanel({
                       <button
                         onClick={endCall}
                         style={{
+                          width: buttonWidth,
                           border: "none",
                           borderRadius: "999px",
                           padding: "14px 22px",

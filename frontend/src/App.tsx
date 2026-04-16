@@ -1,10 +1,11 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import AssistantWidget from "./components/AssistantWidget";
 import LeadsPanel from "./components/LeadsPanel";
-import VoiceAssistant from "./components/VoiceAssistant";
 import VoiceWidget from "./components/VoiceWidget";
 import AssistantsHub from "./pages/AssistantsHub";
+import VoiceWidgetPanel from "./components/VoiceWidgetPanel";
+import { ASSISTANTS } from "./data/assistants";
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
@@ -13,6 +14,7 @@ function HomePage() {
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 960 : false
   );
+  const [selectedDemoId, setSelectedDemoId] = useState("isis");
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 960);
@@ -20,8 +22,13 @@ function HomePage() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  const selectedDemoAssistant = useMemo(
+    () => ASSISTANTS.find((a) => a.id === selectedDemoId) || ASSISTANTS[0],
+    [selectedDemoId]
+  );
+
   const sectionWrap: React.CSSProperties = {
-    maxWidth: "1240px",
+    maxWidth: "1200px",
     margin: "0 auto",
     padding: isMobile ? "0 16px" : "0 24px",
   };
@@ -29,7 +36,7 @@ function HomePage() {
   const panelStyle: React.CSSProperties = {
     background: "rgba(255,255,255,0.04)",
     border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: "28px",
+    borderRadius: isMobile ? "22px" : "28px",
     backdropFilter: "blur(14px)",
     WebkitBackdropFilter: "blur(14px)",
     boxShadow: "0 24px 80px rgba(0,0,0,0.38)",
@@ -37,14 +44,9 @@ function HomePage() {
 
   const mutedText: React.CSSProperties = {
     color: "rgba(255,255,255,0.72)",
-    lineHeight: 1.8,
-    fontSize: "16px",
+    lineHeight: 1.75,
+    fontSize: isMobile ? "15px" : "16px",
     margin: 0,
-  };
-
-  const cardBase: React.CSSProperties = {
-    ...panelStyle,
-    padding: isMobile ? "20px" : "24px",
   };
 
   function TopNav() {
@@ -92,7 +94,7 @@ function HomePage() {
               NYT Assistant
             </div>
             <div style={{ color: "rgba(255,255,255,0.52)", fontSize: "12px" }}>
-              Atención inteligente · ventas · leads · voz
+              Atención inteligente · ventas · voz
             </div>
           </div>
         </div>
@@ -106,11 +108,9 @@ function HomePage() {
           }}
         >
           {[
-            ["#overview", "Solución"],
-            ["#system", "Cómo funciona"],
-            ["#industries", "Sectores"],
-            ["#voice", "Voz"],
-            ["#panel", "Panel"],
+            ["#benefits", "Beneficios"],
+            ["#demo", "Demo"],
+            ["#flow", "Cómo funciona"],
           ].map(([href, label]) => (
             <a
               key={href}
@@ -129,47 +129,6 @@ function HomePage() {
               {label}
             </a>
           ))}
-        </div>
-      </div>
-    );
-  }
-
-  function StatBlock({
-    title,
-    value,
-  }: {
-    title: string;
-    value: string;
-  }) {
-    return (
-      <div
-        style={{
-          ...panelStyle,
-          padding: "18px 18px",
-          minHeight: "96px",
-        }}
-      >
-        <div
-          style={{
-            color: "rgba(255,255,255,0.55)",
-            fontSize: "12px",
-            fontWeight: 700,
-            marginBottom: "8px",
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-          }}
-        >
-          {title}
-        </div>
-        <div
-          style={{
-            color: "#fff",
-            fontSize: "20px",
-            fontWeight: 900,
-            letterSpacing: "-0.03em",
-          }}
-        >
-          {value}
         </div>
       </div>
     );
@@ -198,7 +157,7 @@ function HomePage() {
     );
   }
 
-  function InfoCard({
+  function BenefitCard({
     title,
     text,
   }: {
@@ -206,12 +165,17 @@ function HomePage() {
     text: string;
   }) {
     return (
-      <div style={cardBase}>
+      <div
+        style={{
+          ...panelStyle,
+          padding: isMobile ? "18px" : "22px",
+        }}
+      >
         <h3
           style={{
-            margin: "0 0 12px",
+            margin: "0 0 10px",
             color: "#fff",
-            fontSize: "22px",
+            fontSize: isMobile ? "20px" : "22px",
             fontWeight: 900,
             letterSpacing: "-0.03em",
           }}
@@ -223,59 +187,46 @@ function HomePage() {
     );
   }
 
-  function SystemFlowCard({
-    index,
+  function StepCard({
+    step,
     title,
     text,
   }: {
-    index: string;
+    step: string;
     title: string;
     text: string;
   }) {
     return (
       <div
         style={{
-          ...cardBase,
+          ...panelStyle,
+          padding: isMobile ? "18px" : "22px",
           position: "relative",
           overflow: "hidden",
         }}
       >
         <div
           style={{
-            position: "absolute",
-            top: "-18px",
-            right: "-10px",
-            fontSize: "86px",
-            fontWeight: 900,
-            color: "rgba(255,255,255,0.04)",
-            lineHeight: 1,
-          }}
-        >
-          {index}
-        </div>
-
-        <div
-          style={{
-            width: "46px",
-            height: "46px",
+            width: "42px",
+            height: "42px",
             borderRadius: "14px",
             background: "linear-gradient(135deg, #ff2a2a, #740000)",
             display: "grid",
             placeItems: "center",
             color: "#fff",
             fontWeight: 900,
-            marginBottom: "16px",
+            marginBottom: "14px",
             boxShadow: "0 14px 32px rgba(255, 42, 42, 0.3)",
           }}
         >
-          {index}
+          {step}
         </div>
 
         <h3
           style={{
-            margin: "0 0 12px",
+            margin: "0 0 10px",
             color: "#fff",
-            fontSize: "20px",
+            fontSize: isMobile ? "19px" : "20px",
             fontWeight: 900,
           }}
         >
@@ -286,209 +237,207 @@ function HomePage() {
     );
   }
 
-  function HeroInterface() {
+  function DemoSelector() {
     return (
       <div
         style={{
-          ...panelStyle,
-          padding: isMobile ? "20px" : "24px",
-          minHeight: isMobile ? "auto" : "560px",
           display: "grid",
-          gap: "16px",
-          alignContent: "start",
-          background:
-            "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 28%), rgba(255,255,255,0.04)",
+          gap: "12px",
+          marginBottom: "18px",
         }}
       >
         <div
           style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1.15fr 0.85fr",
-            gap: "16px",
+            color: "rgba(255,255,255,0.68)",
+            fontSize: "14px",
+            fontWeight: 700,
           }}
         >
-          <div
-            style={{
-              background: "rgba(0,0,0,0.34)",
-              border: "1px solid rgba(255,255,255,0.08)",
-              borderRadius: "24px",
-              padding: "18px",
-            }}
-          >
-            <div
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center",
-                marginBottom: "16px",
-                gap: "12px",
-              }}
-            >
-              <div>
-                <div style={{ color: "#fff", fontWeight: 900, fontSize: "17px" }}>
-                  Conversación activa
-                </div>
-                <div style={{ color: "rgba(255,255,255,0.5)", fontSize: "13px" }}>
-                  Atención en tiempo real con NYT Assistant
-                </div>
-              </div>
-              <div
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: "999px",
-                  background: "rgba(255, 42, 42, 0.14)",
-                  border: "1px solid rgba(255, 42, 42, 0.3)",
-                  color: "#ffd4d4",
-                  fontWeight: 800,
-                  fontSize: "12px",
-                }}
-              >
-                EN LÍNEA
-              </div>
-            </div>
-
-            <div style={{ display: "grid", gap: "12px" }}>
-              <div
-                style={{
-                  maxWidth: "82%",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.82)",
-                  padding: "12px 14px",
-                  borderRadius: "16px 16px 16px 4px",
-                  lineHeight: 1.6,
-                  fontSize: "14px",
-                }}
-              >
-                Hola, quiero que mi negocio atienda clientes todo el día sin
-                perder oportunidades.
-              </div>
-
-              <div
-                style={{
-                  marginLeft: "auto",
-                  maxWidth: "86%",
-                  background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
-                  color: "#fff",
-                  padding: "12px 14px",
-                  borderRadius: "16px 16px 4px 16px",
-                  lineHeight: 1.6,
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  boxShadow: "0 18px 40px rgba(255, 42, 42, 0.22)",
-                }}
-              >
-                Perfecto. NYT Assistant responde consultas, detecta intención
-                de compra, captura datos clave y deja cada oportunidad lista
-                para seguimiento.
-              </div>
-
-              <div
-                style={{
-                  maxWidth: "70%",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.82)",
-                  padding: "12px 14px",
-                  borderRadius: "16px 16px 16px 4px",
-                  lineHeight: 1.6,
-                  fontSize: "14px",
-                }}
-              >
-                Me interesa para ventas y para responder por WhatsApp.
-              </div>
-            </div>
-          </div>
-
-          <div style={{ display: "grid", gap: "16px" }}>
-            <div
-              style={{
-                background: "rgba(0,0,0,0.34)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "24px",
-                padding: "18px",
-              }}
-            >
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "12px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: "8px",
-                  fontWeight: 800,
-                }}
-              >
-                Ruta asignada
-              </div>
-              <div style={{ color: "#fff", fontWeight: 900, fontSize: "20px" }}>
-                Agente comercial
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: "rgba(0,0,0,0.34)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "24px",
-                padding: "18px",
-              }}
-            >
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "12px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: "8px",
-                  fontWeight: 800,
-                }}
-              >
-                Estado del lead
-              </div>
-              <div style={{ color: "#fff", fontWeight: 900, fontSize: "20px" }}>
-                Oportunidad detectada
-              </div>
-            </div>
-
-            <div
-              style={{
-                background: "rgba(0,0,0,0.34)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                borderRadius: "24px",
-                padding: "18px",
-              }}
-            >
-              <div
-                style={{
-                  color: "rgba(255,255,255,0.5)",
-                  fontSize: "12px",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.08em",
-                  marginBottom: "8px",
-                  fontWeight: 800,
-                }}
-              >
-                Preparado para
-              </div>
-              <div style={{ color: "#fff", fontWeight: 900, fontSize: "20px" }}>
-                Web + voz
-              </div>
-            </div>
-          </div>
+          Elige un asistente para probar:
         </div>
 
         <div
           style={{
             display: "grid",
             gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-            gap: "14px",
+            gap: "12px",
           }}
         >
-          <StatBlock title="Atención" value="Disponible 24/7" />
-          <StatBlock title="Arquitectura" value="Lógica multiagente" />
-          <StatBlock title="Objetivo" value="Convertir más contactos" />
+          {ASSISTANTS.map((assistant) => {
+            const active = assistant.id === selectedDemoId;
+
+            return (
+              <button
+                key={assistant.id}
+                onClick={() => setSelectedDemoId(assistant.id)}
+                style={{
+                  textAlign: "left",
+                  border: active
+                    ? `1px solid ${assistant.color}`
+                    : "1px solid rgba(255,255,255,0.08)",
+                  background: active
+                    ? "rgba(255,255,255,0.12)"
+                    : "rgba(255,255,255,0.05)",
+                  borderRadius: "18px",
+                  padding: "14px",
+                  cursor: "pointer",
+                  color: "#fff",
+                  transition: "0.2s ease",
+                  minWidth: 0,
+                }}
+              >
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "10px",
+                  }}
+                >
+                  <div
+                    style={{
+                      width: "12px",
+                      height: "12px",
+                      borderRadius: "999px",
+                      background: assistant.color,
+                      boxShadow: `0 0 18px ${assistant.color}`,
+                      flexShrink: 0,
+                    }}
+                  />
+                  <div style={{ minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 900,
+                        fontSize: "15px",
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {assistant.name}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: "12px",
+                        color: "rgba(255,255,255,0.7)",
+                        marginTop: "2px",
+                        lineHeight: 1.45,
+                        wordBreak: "break-word",
+                      }}
+                    >
+                      {assistant.role}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            );
+          })}
         </div>
+      </div>
+    );
+  }
+
+  function EmbeddedDemo() {
+    return (
+      <div
+        style={{
+          ...panelStyle,
+          padding: isMobile ? "18px" : "24px",
+          background:
+            "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 28%), rgba(255,255,255,0.04)",
+        }}
+      >
+        <div
+          style={{
+            marginBottom: "16px",
+            display: "flex",
+            flexDirection: isMobile ? "column" : "row",
+            alignItems: isMobile ? "flex-start" : "center",
+            justifyContent: "space-between",
+            gap: "12px",
+          }}
+        >
+          <div>
+            <div
+              style={{
+                color: "#fff",
+                fontWeight: 900,
+                fontSize: isMobile ? "24px" : "30px",
+                letterSpacing: "-0.03em",
+              }}
+            >
+              Pruébalo aquí mismo
+            </div>
+            <div style={{ color: "rgba(255,255,255,0.62)", fontSize: "14px" }}>
+              Sin cambiar de página. Sin pasos extra.
+            </div>
+          </div>
+
+          <a
+            href="/assistants"
+            style={{
+              textDecoration: "none",
+              background: "rgba(255,255,255,0.05)",
+              border: "1px solid rgba(255,255,255,0.08)",
+              color: "#fff",
+              padding: "12px 16px",
+              borderRadius: "14px",
+              fontWeight: 800,
+              textAlign: "center",
+              width: isMobile ? "100%" : "auto",
+            }}
+          >
+            Ver demo completa
+          </a>
+        </div>
+
+        <DemoSelector />
+
+        <div
+          style={{
+            marginBottom: "16px",
+            padding: "14px 16px",
+            borderRadius: "18px",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+          }}
+        >
+          <div
+            style={{
+              color: selectedDemoAssistant.color,
+              fontWeight: 800,
+              fontSize: "12px",
+              letterSpacing: "0.08em",
+              textTransform: "uppercase",
+              marginBottom: "6px",
+            }}
+          >
+            Demo activa
+          </div>
+          <div
+            style={{
+              color: "#fff",
+              fontWeight: 900,
+              fontSize: isMobile ? "22px" : "28px",
+              lineHeight: 1.05,
+              marginBottom: "6px",
+            }}
+          >
+            {selectedDemoAssistant.name}
+          </div>
+          <div
+            style={{
+              color: "rgba(255,255,255,0.68)",
+              fontSize: "14px",
+              lineHeight: 1.6,
+            }}
+          >
+            {selectedDemoAssistant.role}
+          </div>
+        </div>
+
+        <VoiceWidgetPanel
+          assistantName={selectedDemoAssistant.name}
+          assistantId={selectedDemoAssistant.id}
+          assistantColor={selectedDemoAssistant.color}
+        />
       </div>
     );
   }
@@ -510,10 +459,10 @@ function HomePage() {
         <div
           style={{
             display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1.04fr 0.96fr",
-            gap: "26px",
-            alignItems: "stretch",
-            minHeight: isMobile ? "auto" : "78vh",
+            gridTemplateColumns: isMobile ? "1fr" : "1.02fr 0.98fr",
+            gap: "24px",
+            alignItems: "center",
+            minHeight: isMobile ? "auto" : "64vh",
           }}
         >
           <div
@@ -521,22 +470,22 @@ function HomePage() {
               display: "flex",
               flexDirection: "column",
               justifyContent: "center",
-              gap: "22px",
+              gap: "20px",
             }}
           >
-            <RedLabel>IA para atención, ventas y evolución a voz</RedLabel>
+            <RedLabel>Atención inteligente para negocios</RedLabel>
 
             <h1
               style={{
                 margin: 0,
-                fontSize: "clamp(44px, 7vw, 92px)",
-                lineHeight: 0.94,
+                fontSize: "clamp(42px, 7vw, 88px)",
+                lineHeight: 0.95,
                 letterSpacing: "-0.06em",
                 fontWeight: 900,
-                maxWidth: "820px",
+                maxWidth: "800px",
               }}
             >
-              Convierte cada conversación en una oportunidad real de venta.
+              Atiende mejor, responde más rápido y convierte más clientes.
             </h1>
 
             <p
@@ -546,10 +495,9 @@ function HomePage() {
                 maxWidth: "760px",
               }}
             >
-              NYT Assistant responde clientes en segundos, detecta intención de
-              compra, captura datos clave y deja cada lead listo para
-              seguimiento. Sin esperas, sin formularios largos y sin perder
-              oportunidades por falta de atención.
+              NYT Assistant responde conversaciones en segundos, detecta
+              intención de compra, guía al usuario y deja cada oportunidad lista
+              para seguimiento.
             </p>
 
             <div
@@ -561,7 +509,7 @@ function HomePage() {
               }}
             >
               <a
-                href="#overview"
+                href="#demo"
                 style={{
                   textDecoration: "none",
                   background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
@@ -573,11 +521,11 @@ function HomePage() {
                   textAlign: "center",
                 }}
               >
-                Conocer la solución
+                Probar ahora
               </a>
 
               <a
-                href="/admin"
+                href="#benefits"
                 style={{
                   textDecoration: "none",
                   background: "rgba(255,255,255,0.04)",
@@ -589,248 +537,306 @@ function HomePage() {
                   textAlign: "center",
                 }}
               >
-                Ver panel administrativo
+                Ver beneficios
               </a>
             </div>
           </div>
 
-          <HeroInterface />
-        </div>
-      </section>
-
-      <section id="overview" style={{ ...sectionWrap, paddingTop: "84px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "0.9fr 1.1fr",
-            gap: "22px",
-            marginBottom: "22px",
-            alignItems: "start",
-          }}
-        >
-          <div>
-            <RedLabel>Solución</RedLabel>
-            <h2
-              style={{
-                fontSize: "clamp(32px, 4.2vw, 58px)",
-                lineHeight: 0.98,
-                letterSpacing: "-0.05em",
-                margin: "18px 0 0",
-                fontWeight: 900,
-              }}
-            >
-              Un sistema diseñado para vender, no solo para responder
-            </h2>
-          </div>
-          <div style={cardBase}>
-            <p style={mutedText}>
-              NYT Assistant no es un chatbot decorativo. Es una herramienta
-              pensada para atender mejor, filtrar oportunidades reales y
-              convertir conversaciones en acciones concretas para tu negocio.
-            </p>
-          </div>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "18px",
-          }}
-        >
-          <InfoCard
-            title="Respuestas inmediatas"
-            text="Atiende clientes en tiempo real, sin importar la hora, con una comunicación clara, profesional y enfocada en avanzar la conversación."
-          />
-          <InfoCard
-            title="Captura automática de leads"
-            text="Cuando detecta interés, solicita datos clave y los registra para que tu equipo pueda dar seguimiento sin perder el contacto."
-          />
-          <InfoCard
-            title="Conversaciones que convierten"
-            text="No se limita a responder preguntas. Guía al usuario hacia acciones como contacto, cotización, agendamiento o seguimiento comercial."
-          />
-        </div>
-      </section>
-
-      <section id="system" style={{ ...sectionWrap, paddingTop: "84px" }}>
-        <div style={{ marginBottom: "24px" }}>
-          <RedLabel>Cómo funciona</RedLabel>
-          <h2
-            style={{
-              fontSize: "clamp(32px, 4vw, 56px)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              margin: "18px 0 14px",
-              fontWeight: 900,
-              maxWidth: "780px",
-            }}
-          >
-            Cada interacción sigue un flujo pensado para generar resultados
-          </h2>
-          <p style={{ ...mutedText, maxWidth: "860px" }}>
-            Desde el primer mensaje hasta la captura del lead, el sistema
-            organiza la conversación para entender al usuario, responder con
-            precisión y convertir el interés en una oportunidad real.
-          </p>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))",
-            gap: "18px",
-          }}
-        >
-          <SystemFlowCard
-            index="1"
-            title="El cliente inicia contacto"
-            text="Pregunta, solicita información o muestra interés desde cualquier dispositivo y en cualquier momento."
-          />
-          <SystemFlowCard
-            index="2"
-            title="Se detecta la intención"
-            text="El sistema identifica si la conversación requiere enfoque comercial, información general, soporte o agendamiento."
-          />
-          <SystemFlowCard
-            index="3"
-            title="Respuesta estratégica"
-            text="El asistente responde con el tono y el enfoque adecuados para mantener el interés y llevar la conversación al siguiente paso."
-          />
-          <SystemFlowCard
-            index="4"
-            title="Lead registrado"
-            text="Cuando existe oportunidad, los datos se capturan y quedan listos para seguimiento desde el panel administrativo."
-          />
-        </div>
-      </section>
-
-      <section id="industries" style={{ ...sectionWrap, paddingTop: "84px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
-            gap: "18px",
-            marginBottom: "18px",
-          }}
-        >
-          <div style={cardBase}>
-            <RedLabel>Sectores</RedLabel>
-            <h3
-              style={{
-                margin: "18px 0 12px",
-                fontSize: "30px",
-                fontWeight: 900,
-                letterSpacing: "-0.04em",
-              }}
-            >
-              Diseñado para negocios que dependen de clientes
-            </h3>
-            <p style={mutedText}>
-              Funciona en empresas, servicios, clínicas y operaciones donde una
-              conversación bien atendida puede convertirse en una venta, una
-              cita o una oportunidad de seguimiento.
-            </p>
-          </div>
-
           <div
             style={{
-              display: "grid",
-              gap: "18px",
+              ...panelStyle,
+              padding: isMobile ? "18px" : "24px",
+              background:
+                "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 28%), rgba(255,255,255,0.04)",
             }}
           >
-            <InfoCard
-              title="Ventas y atención comercial"
-              text="Ideal para responder consultas, presentar servicios, calificar oportunidades y avanzar al usuario hacia una cotización o contacto directo."
-            />
-            <InfoCard
-              title="Clínicas, servicios y equipos de atención"
-              text="Ayuda a orientar usuarios, resolver dudas frecuentes y ordenar mejor la atención inicial sin saturar al equipo humano."
-            />
+            <div
+              style={{
+                display: "grid",
+                gap: "12px",
+              }}
+            >
+              <div
+                style={{
+                  maxWidth: "82%",
+                  background: "rgba(255,255,255,0.06)",
+                  border: "1px solid rgba(255,255,255,0.06)",
+                  color: "rgba(255,255,255,0.82)",
+                  padding: "12px 14px",
+                  borderRadius: "16px 16px 16px 4px",
+                  lineHeight: 1.6,
+                  fontSize: "14px",
+                }}
+              >
+                Hola, quiero que mi negocio responda clientes sin perder ventas.
+              </div>
+
+              <div
+                style={{
+                  marginLeft: "auto",
+                  maxWidth: "86%",
+                  background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
+                  color: "#fff",
+                  padding: "12px 14px",
+                  borderRadius: "16px 16px 4px 16px",
+                  lineHeight: 1.6,
+                  fontSize: "14px",
+                  fontWeight: 700,
+                  boxShadow: "0 18px 40px rgba(255, 42, 42, 0.22)",
+                }}
+              >
+                Perfecto. NYT Assistant responde consultas, detecta intención de
+                compra y deja cada oportunidad lista para seguimiento.
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                  gap: "12px",
+                  marginTop: "8px",
+                }}
+              >
+                {[
+                  ["Disponible", "24/7"],
+                  ["Enfoque", "Ventas + atención"],
+                  ["Resultado", "Más leads útiles"],
+                ].map(([label, value]) => (
+                  <div
+                    key={label}
+                    style={{
+                      background: "rgba(0,0,0,0.34)",
+                      border: "1px solid rgba(255,255,255,0.08)",
+                      borderRadius: "18px",
+                      padding: "14px",
+                    }}
+                  >
+                    <div
+                      style={{
+                        color: "rgba(255,255,255,0.5)",
+                        fontSize: "11px",
+                        textTransform: "uppercase",
+                        letterSpacing: "0.08em",
+                        marginBottom: "8px",
+                        fontWeight: 800,
+                      }}
+                    >
+                      {label}
+                    </div>
+                    <div
+                      style={{
+                        color: "#fff",
+                        fontWeight: 900,
+                        fontSize: "18px",
+                      }}
+                    >
+                      {value}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
 
-      <section id="panel" style={{ ...sectionWrap, paddingTop: "84px" }}>
-        <div
-          style={{
-            ...panelStyle,
-            padding: isMobile ? "24px" : "30px",
-            background:
-              "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 22%), rgba(255,255,255,0.04)",
-          }}
-        >
-          <RedLabel>Panel administrativo</RedLabel>
+      <section id="benefits" style={{ ...sectionWrap, paddingTop: "70px" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <RedLabel>Beneficios</RedLabel>
           <h2
             style={{
-              fontSize: "clamp(32px, 4vw, 56px)",
+              fontSize: "clamp(30px, 4vw, 54px)",
               lineHeight: 0.98,
               letterSpacing: "-0.05em",
-              margin: "18px 0 14px",
+              margin: "16px 0 10px",
               fontWeight: 900,
               maxWidth: "760px",
             }}
           >
-            Control total sobre tus oportunidades
+            Qué hace por tu negocio, explicado sin rodeos
           </h2>
-          <p style={{ ...mutedText, maxWidth: "840px", marginBottom: "24px" }}>
-            Visualiza leads, revisa conversaciones y detecta oportunidades
-            reales desde un solo panel, con una vista clara para dar
-            seguimiento sin depender de herramientas externas.
+          <p style={{ ...mutedText, maxWidth: "760px" }}>
+            Lo importante es que el cliente lo entienda rápido y vea el valor
+            antes de saturarse con demasiada información.
           </p>
+        </div>
 
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-              gap: "18px",
-            }}
-          >
-            <InfoCard
-              title="Leads organizados"
-              text="Consulta nombre, teléfono, historial de mensajes y nivel de interés desde una misma interfaz."
-            />
-            <InfoCard
-              title="Visibilidad operativa"
-              text="Detecta qué preguntas se repiten, qué contactos muestran intención real y dónde conviene enfocar seguimiento."
-            />
-            <InfoCard
-              title="Base para escalar"
-              text="La solución queda lista para crecer hacia nuevas automatizaciones, más canales y una experiencia de voz más avanzada."
-            />
-          </div>
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+            gap: "18px",
+          }}
+        >
+          <BenefitCard
+            title="Responde al instante"
+            text="Atiende consultas en tiempo real para que tu negocio no dependa de horarios ni de respuestas tardías."
+          />
+          <BenefitCard
+            title="Detecta oportunidades"
+            text="Identifica intención de compra y guía la conversación hacia cotización, contacto o seguimiento."
+          />
+          <BenefitCard
+            title="Escala la atención"
+            text="Puede operar por chat y evolucionar a voz para una experiencia más cercana y más fuerte para tu marca."
+          />
         </div>
       </section>
 
       <section
-        id="voice"
-        style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "90px" }}
+        id="demo"
+        style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "8px" }}
       >
-        <div style={{ marginBottom: "22px" }}>
-          <RedLabel>Voz</RedLabel>
+        <div style={{ marginBottom: "20px" }}>
+          <RedLabel>Demo principal</RedLabel>
           <h2
             style={{
-              fontSize: "clamp(32px, 4vw, 56px)",
+              fontSize: "clamp(30px, 4vw, 54px)",
               lineHeight: 0.98,
               letterSpacing: "-0.05em",
-              margin: "18px 0 14px",
+              margin: "16px 0 10px",
               fontWeight: 900,
               maxWidth: "760px",
             }}
           >
-            El siguiente paso es hablar con tus clientes
+            Aquí mismo debe aparecer la IA
           </h2>
-          <p style={{ ...mutedText, maxWidth: "820px" }}>
-            NYT Assistant está preparado para evolucionar de chat a voz,
-            permitiendo conversaciones más naturales, una experiencia más
-            cercana y una presencia mucho más fuerte para tu marca.
+          <p style={{ ...mutedText, maxWidth: "760px" }}>
+            Así el cliente la ve desde la página principal, entiende que es real
+            y puede probarla sin tener que descubrir otra ruta primero.
           </p>
         </div>
 
-        <VoiceAssistant
-          assistantName="NYT Assistant"
-          subtitle="Interfaz preparada para evolucionar hacia voz en tiempo real"
-        />
+        <EmbeddedDemo />
+      </section>
+
+      <section id="flow" style={{ ...sectionWrap, paddingTop: "84px" }}>
+        <div style={{ marginBottom: "20px" }}>
+          <RedLabel>Cómo funciona</RedLabel>
+          <h2
+            style={{
+              fontSize: "clamp(30px, 4vw, 54px)",
+              lineHeight: 0.98,
+              letterSpacing: "-0.05em",
+              margin: "16px 0 10px",
+              fontWeight: 900,
+              maxWidth: "760px",
+            }}
+          >
+            Un flujo simple que el cliente entiende rápido
+          </h2>
+        </div>
+
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
+            gap: "18px",
+          }}
+        >
+          <StepCard
+            step="1"
+            title="El usuario pregunta"
+            text="Hace una consulta, pide información o inicia conversación desde cualquier dispositivo."
+          />
+          <StepCard
+            step="2"
+            title="El sistema detecta intención"
+            text="Reconoce si la conversación es atención, ventas, soporte o seguimiento."
+          />
+          <StepCard
+            step="3"
+            title="Responde y guía"
+            text="Da una respuesta útil y lleva la conversación al siguiente paso correcto."
+          />
+          <StepCard
+            step="4"
+            title="Guarda la oportunidad"
+            text="Cuando hay interés real, la información queda lista para seguimiento."
+          />
+        </div>
+      </section>
+
+      <section
+        style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "100px" }}
+      >
+        <div
+          style={{
+            ...panelStyle,
+            padding: isMobile ? "22px" : "30px",
+            background:
+              "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 22%), rgba(255,255,255,0.04)",
+            textAlign: isMobile ? "left" : "center",
+          }}
+        >
+          <RedLabel>CTA</RedLabel>
+          <h2
+            style={{
+              fontSize: "clamp(30px, 4vw, 52px)",
+              lineHeight: 0.98,
+              letterSpacing: "-0.05em",
+              margin: "16px 0 12px",
+              fontWeight: 900,
+            }}
+          >
+            Enséñalo simple. Haz que lo prueben. Y deja que la demo haga el resto.
+          </h2>
+
+          <p
+            style={{
+              ...mutedText,
+              maxWidth: "760px",
+              margin: isMobile ? 0 : "0 auto",
+            }}
+          >
+            Esa es la mejor forma de interesar al cliente sin que se pierda ni
+            se sature.
+          </p>
+
+          <div
+            style={{
+              marginTop: "22px",
+              display: "flex",
+              justifyContent: isMobile ? "stretch" : "center",
+              gap: "12px",
+              flexDirection: isMobile ? "column" : "row",
+            }}
+          >
+            <a
+              href="#demo"
+              style={{
+                textDecoration: "none",
+                background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
+                color: "#fff",
+                padding: "16px 22px",
+                borderRadius: "16px",
+                fontWeight: 900,
+                boxShadow: "0 18px 50px rgba(255, 42, 42, 0.28)",
+                minWidth: isMobile ? "100%" : "auto",
+                textAlign: "center",
+              }}
+            >
+              Probar la demo aquí
+            </a>
+
+            <a
+              href="/assistants"
+              style={{
+                textDecoration: "none",
+                background: "rgba(255,255,255,0.04)",
+                border: "1px solid rgba(255,255,255,0.08)",
+                color: "#fff",
+                padding: "16px 22px",
+                borderRadius: "16px",
+                fontWeight: 800,
+                minWidth: isMobile ? "100%" : "auto",
+                textAlign: "center",
+              }}
+            >
+              Abrir versión completa
+            </a>
+          </div>
+        </div>
       </section>
 
       <AssistantWidget
