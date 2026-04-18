@@ -94,7 +94,7 @@ function HomePage() {
               NYT Assistant
             </div>
             <div style={{ color: "rgba(255,255,255,0.52)", fontSize: "12px" }}>
-              Atención inteligente · ventas · voz
+              Automatización conversacional para ventas y atención
             </div>
           </div>
         </div>
@@ -253,7 +253,7 @@ function HomePage() {
             fontWeight: 700,
           }}
         >
-          Elige un asistente para probar:
+          Selecciona un asistente y pruébalo en tiempo real:
         </div>
 
         <div
@@ -363,10 +363,10 @@ function HomePage() {
                 letterSpacing: "-0.03em",
               }}
             >
-              Pruébalo aquí mismo
+              Demo interactiva
             </div>
             <div style={{ color: "rgba(255,255,255,0.62)", fontSize: "14px" }}>
-              Sin cambiar de página. Sin pasos extra.
+              Conoce cómo responde, guía y atiende desde la primera interacción.
             </div>
           </div>
 
@@ -384,7 +384,7 @@ function HomePage() {
               width: isMobile ? "100%" : "auto",
             }}
           >
-            Ver demo completa
+            Ver experiencia completa
           </a>
         </div>
 
@@ -409,7 +409,7 @@ function HomePage() {
               marginBottom: "6px",
             }}
           >
-            Demo activa
+            Asistente seleccionado
           </div>
           <div
             style={{
@@ -473,7 +473,7 @@ function HomePage() {
               gap: "20px",
             }}
           >
-            <RedLabel>Atención inteligente para negocios</RedLabel>
+            <RedLabel>Solución inteligente para negocios</RedLabel>
 
             <h1
               style={{
@@ -485,7 +485,7 @@ function HomePage() {
                 maxWidth: "800px",
               }}
             >
-              Atiende mejor, responde más rápido y convierte más clientes.
+              Automatiza tu atención y convierte más conversaciones en ventas.
             </h1>
 
             <p
@@ -495,9 +495,10 @@ function HomePage() {
                 maxWidth: "760px",
               }}
             >
-              NYT Assistant responde conversaciones en segundos, detecta
-              intención de compra, guía al usuario y deja cada oportunidad lista
-              para seguimiento.
+              NYT Assistant ayuda a tu negocio a responder más rápido, atender
+              mejor y aprovechar cada oportunidad desde el primer mensaje.
+              Automatiza consultas, filtra prospectos y mantiene una experiencia
+              profesional en cada conversación.
             </p>
 
             <div
@@ -521,7 +522,7 @@ function HomePage() {
                   textAlign: "center",
                 }}
               >
-                Probar ahora
+                Probar demo
               </a>
 
               <a
@@ -537,7 +538,7 @@ function HomePage() {
                   textAlign: "center",
                 }}
               >
-                Ver beneficios
+                Conocer más
               </a>
             </div>
           </div>
@@ -568,7 +569,8 @@ function HomePage() {
                   fontSize: "14px",
                 }}
               >
-                Hola, quiero que mi negocio responda clientes sin perder ventas.
+                Hola, quiero una solución para atender clientes sin depender de
+                horarios ni respuestas manuales.
               </div>
 
               <div
@@ -585,8 +587,9 @@ function HomePage() {
                   boxShadow: "0 18px 40px rgba(255, 42, 42, 0.22)",
                 }}
               >
-                Perfecto. NYT Assistant responde consultas, detecta intención de
-                compra y deja cada oportunidad lista para seguimiento.
+                Perfecto. NYT Assistant automatiza respuestas, identifica
+                oportunidades reales y mantiene una atención constante para que
+                tu negocio no pierda clientes.
               </div>
 
               <div
@@ -598,9 +601,9 @@ function HomePage() {
                 }}
               >
                 {[
-                  ["Disponible", "24/7"],
-                  ["Enfoque", "Ventas + atención"],
-                  ["Resultado", "Más leads útiles"],
+                  ["Disponibilidad", "24/7"],
+                  ["Aplicación", "Ventas y atención"],
+                  ["Impacto", "Más prospectos útiles"],
                 ].map(([label, value]) => (
                   <div
                     key={label}
@@ -653,11 +656,11 @@ function HomePage() {
               maxWidth: "760px",
             }}
           >
-            Qué hace por tu negocio, explicado sin rodeos
+            Lo que realmente aporta a tu negocio
           </h2>
           <p style={{ ...mutedText, maxWidth: "760px" }}>
-            Lo importante es que el cliente lo entienda rápido y vea el valor
-            antes de saturarse con demasiada información.
+            Una solución diseñada para responder mejor, atender más rápido y dar
+            seguimiento a cada oportunidad sin saturar tu operación diaria.
           </p>
         </div>
 
@@ -669,16 +672,16 @@ function HomePage() {
           }}
         >
           <BenefitCard
-            title="Responde al instante"
-            text="Atiende consultas en tiempo real para que tu negocio no dependa de horarios ni de respuestas tardías."
+            title="Atención inmediata"
+            text="Responde mensajes en segundos para que tus clientes reciban información clara, útil y oportuna desde el primer contacto."
           />
           <BenefitCard
-            title="Detecta oportunidades"
-            text="Identifica intención de compra y guía la conversación hacia cotización, contacto o seguimiento."
+            title="Mejor calificación de prospectos"
+            text="Detecta intención de compra, organiza conversaciones y ayuda a identificar qué contactos tienen mayor probabilidad de convertirse en venta."
           />
           <BenefitCard
-            title="Escala la atención"
-            text="Puede operar por chat y evolucionar a voz para una experiencia más cercana y más fuerte para tu marca."
+            title="Operación más eficiente"
+            text="Reduce carga operativa en atención, mantiene conversaciones activas y permite escalar sin depender de más personal para responder lo mismo."
           />
         </div>
       </section>
@@ -699,11 +702,11 @@ function HomePage() {
               maxWidth: "760px",
             }}
           >
-            Aquí mismo debe aparecer la IA
+            Pruébalo directamente desde esta página
           </h2>
           <p style={{ ...mutedText, maxWidth: "760px" }}>
-            Así el cliente la ve desde la página principal, entiende que es real
-            y puede probarla sin tener que descubrir otra ruta primero.
+            Aquí puedes ver cómo responde, cómo guía la conversación y cómo se
+            adapta a distintos tipos de atención sin salir del sitio.
           </p>
         </div>
 
@@ -723,7 +726,7 @@ function HomePage() {
               maxWidth: "760px",
             }}
           >
-            Un flujo simple que el cliente entiende rápido
+            Un proceso claro, rápido y fácil de implementar
           </h2>
         </div>
 
@@ -736,23 +739,23 @@ function HomePage() {
         >
           <StepCard
             step="1"
-            title="El usuario pregunta"
-            text="Hace una consulta, pide información o inicia conversación desde cualquier dispositivo."
+            title="El cliente inicia la conversación"
+            text="Escribe o habla desde la web para hacer una consulta, pedir información o iniciar un proceso de compra."
           />
           <StepCard
             step="2"
-            title="El sistema detecta intención"
-            text="Reconoce si la conversación es atención, ventas, soporte o seguimiento."
+            title="El asistente interpreta la necesidad"
+            text="Analiza el mensaje para entender si se trata de ventas, soporte, seguimiento o una solicitud específica."
           />
           <StepCard
             step="3"
-            title="Responde y guía"
-            text="Da una respuesta útil y lleva la conversación al siguiente paso correcto."
+            title="Responde y orienta"
+            text="Entrega una respuesta útil, mantiene el contexto y lleva la conversación hacia el siguiente paso correcto."
           />
           <StepCard
             step="4"
-            title="Guarda la oportunidad"
-            text="Cuando hay interés real, la información queda lista para seguimiento."
+            title="Tu negocio recibe oportunidades mejor organizadas"
+            text="Cuando detecta interés real, la información queda lista para seguimiento y una atención comercial más efectiva."
           />
         </div>
       </section>
@@ -769,7 +772,7 @@ function HomePage() {
             textAlign: isMobile ? "left" : "center",
           }}
         >
-          <RedLabel>CTA</RedLabel>
+          <RedLabel>Empieza hoy</RedLabel>
           <h2
             style={{
               fontSize: "clamp(30px, 4vw, 52px)",
@@ -779,7 +782,7 @@ function HomePage() {
               fontWeight: 900,
             }}
           >
-            Enséñalo simple. Haz que lo prueben. Y deja que la demo haga el resto.
+            Muestra una experiencia real desde el primer momento.
           </h2>
 
           <p
@@ -789,8 +792,9 @@ function HomePage() {
               margin: isMobile ? 0 : "0 auto",
             }}
           >
-            Esa es la mejor forma de interesar al cliente sin que se pierda ni
-            se sature.
+            La mejor forma de presentar una solución como esta es dejar que el
+            cliente la vea funcionando, la pruebe y entienda su valor en pocos
+            segundos.
           </p>
 
           <div
@@ -816,7 +820,7 @@ function HomePage() {
                 textAlign: "center",
               }}
             >
-              Probar la demo aquí
+              Probar la demo
             </a>
 
             <a
@@ -833,7 +837,7 @@ function HomePage() {
                 textAlign: "center",
               }}
             >
-              Abrir versión completa
+              Ver experiencia completa
             </a>
           </div>
         </div>
