@@ -27,6 +27,12 @@ const pulseKeyframes = `
   50% { transform: scaleY(1); opacity: 1; }
   100% { transform: scaleY(0.4); opacity: 0.6; }
 }
+
+@keyframes hmPanelGlow {
+  0% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0); }
+  50% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 36px rgba(255,255,255,0.12); }
+  100% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0); }
+}
 `;
 
 function VoiceBars({ active }: { active: boolean }) {
@@ -174,7 +180,10 @@ export default function VoiceWidgetPanel({
   }, []);
 
   useEffect(() => {
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
+    if (
+      !navigator.mediaDevices?.getUserMedia ||
+      typeof MediaRecorder === "undefined"
+    ) {
       setUnsupported(true);
     }
   }, []);
@@ -239,7 +248,7 @@ export default function VoiceWidgetPanel({
           );
         };
       } catch {
-        // ignore
+        //
       }
     }
 
@@ -739,8 +748,7 @@ export default function VoiceWidgetPanel({
       recorderRef.current = recorder;
 
       const AudioContextCtor =
-        window.AudioContext ||
-        (window as any).webkitAudioContext;
+        window.AudioContext || (window as any).webkitAudioContext;
 
       let audioContext: AudioContext | null = null;
       let source: MediaStreamAudioSourceNode | null = null;
@@ -935,6 +943,44 @@ export default function VoiceWidgetPanel({
       ? "linear-gradient(135deg, #facc15, #f59e0b)"
       : `linear-gradient(135deg, ${activeAssistantColor}, #ffffff33)`;
 
+  const activePanelGlow = useMemo(() => {
+    if (voiceState === "recording" || voiceState === "listening") {
+      return {
+        border: "1px solid rgba(34,197,94,0.58)",
+        background:
+          "linear-gradient(180deg, rgba(34,197,94,0.12), rgba(255,255,255,0.06))",
+        boxShadow:
+          "0 0 0 1px rgba(34,197,94,0.12), 0 0 34px rgba(34,197,94,0.28), inset 0 0 26px rgba(34,197,94,0.08)",
+      };
+    }
+
+    if (voiceState === "speaking") {
+      return {
+        border: "1px solid rgba(250,204,21,0.58)",
+        background:
+          "linear-gradient(180deg, rgba(250,204,21,0.12), rgba(255,255,255,0.06))",
+        boxShadow:
+          "0 0 0 1px rgba(250,204,21,0.12), 0 0 36px rgba(250,204,21,0.30), inset 0 0 30px rgba(250,204,21,0.08)",
+      };
+    }
+
+    if (voiceState === "thinking") {
+      return {
+        border: "1px solid rgba(96,165,250,0.55)",
+        background:
+          "linear-gradient(180deg, rgba(96,165,250,0.11), rgba(255,255,255,0.06))",
+        boxShadow:
+          "0 0 0 1px rgba(96,165,250,0.10), 0 0 30px rgba(96,165,250,0.26), inset 0 0 24px rgba(96,165,250,0.08)",
+      };
+    }
+
+    return {
+      border: "1px solid rgba(255,255,255,0.08)",
+      background: "rgba(255,255,255,0.06)",
+      boxShadow: "0 22px 45px rgba(15, 23, 42, 0.12)",
+    };
+  }, [voiceState]);
+
   const initials = activeAssistantName
     .split(" ")
     .map((part) => part[0])
@@ -971,18 +1017,26 @@ export default function VoiceWidgetPanel({
       >
         <div
           style={{
-            background: "rgba(255,255,255,0.06)",
             borderRadius: isMobileLayout ? "22px" : "28px",
-            border: "1px solid rgba(255,255,255,0.08)",
             minHeight: mainCardMinHeight,
             padding: mainCardPadding,
             display: "grid",
             placeItems: "center",
             textAlign: "center",
             backdropFilter: "blur(16px)",
+            transition:
+              "background 0.25s ease, border 0.25s ease, box-shadow 0.25s ease, transform 0.25s ease",
+            animation:
+              voiceState !== "idle" ? "hmPanelGlow 1.8s ease-in-out infinite" : "none",
+            ...activePanelGlow,
           }}
         >
-          <div style={{ width: "100%", maxWidth: isMobileLayout ? "100%" : "420px" }}>
+          <div
+            style={{
+              width: "100%",
+              maxWidth: isMobileLayout ? "100%" : "420px",
+            }}
+          >
             <div
               style={{
                 fontSize: "13px",
@@ -1031,7 +1085,14 @@ export default function VoiceWidgetPanel({
                 color: "#111827",
                 fontSize: orbFontSize,
                 fontWeight: 900,
-                boxShadow: "0 22px 45px rgba(15, 23, 42, 0.24)",
+                boxShadow:
+                  voiceState === "recording" || voiceState === "listening"
+                    ? "0 0 34px rgba(34,197,94,0.30)"
+                    : voiceState === "speaking"
+                    ? "0 0 36px rgba(250,204,21,0.32)"
+                    : voiceState === "thinking"
+                    ? "0 0 30px rgba(96,165,250,0.28)"
+                    : "0 22px 45px rgba(15, 23, 42, 0.24)",
                 animation:
                   callActive && voiceState !== "idle"
                     ? "hmVoicePulse 1.8s ease-in-out infinite"
