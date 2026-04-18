@@ -185,8 +185,137 @@ function wantsDemo(text) {
   ].some((term) => lower.includes(term));
 }
 
+function detectOffTopicMessage(message = "") {
+  const text = normalizeText(message);
+
+  if (!text) return false;
+
+  const businessKeywords = [
+    "precio",
+    "cotizacion",
+    "cotización",
+    "costo",
+    "coste",
+    "plan",
+    "planes",
+    "paquete",
+    "demo",
+    "agendar",
+    "llamada",
+    "servicio",
+    "servicios",
+    "contratar",
+    "comprar",
+    "asistente",
+    "ia",
+    "chatbot",
+    "automatizacion",
+    "automatización",
+    "soporte",
+    "problema",
+    "error",
+    "falla",
+    "fallo",
+    "integrar",
+    "integración",
+    "api",
+    "widget",
+    "pagina",
+    "página",
+    "web",
+    "leads",
+    "clientes",
+    "ventas",
+    "negocio",
+    "empresa",
+    "whatsapp",
+    "contacto",
+    "informacion",
+    "información",
+    "ayuda",
+    "instalar",
+    "configurar",
+    "funciona",
+    "como funciona",
+    "cómo funciona",
+  ];
+
+  const obviousOffTopic = [
+    "cuentame un chiste",
+    "cuéntame un chiste",
+    "chiste",
+    "quien gano",
+    "quién ganó",
+    "futbol",
+    "fútbol",
+    "nba",
+    "pelicula",
+    "película",
+    "serie",
+    "anime",
+    "videojuego",
+    "videojuegos",
+    "horoscopo",
+    "horóscopo",
+    "signo zodiacal",
+    "receta",
+    "cocina",
+    "tarea",
+    "matematicas",
+    "matemáticas",
+    "historia universal",
+    "traduce esto",
+    "poema",
+    "cancion",
+    "canción",
+    "novia",
+    "novio",
+    "amor",
+    "religion",
+    "religión",
+    "politica",
+    "política",
+  ];
+
+  if (obviousOffTopic.some((term) => text.includes(term))) {
+    return true;
+  }
+
+  const hasBusinessIntent = businessKeywords.some((term) =>
+    text.includes(term)
+  );
+
+  const veryShortAllowed = [
+    "hola",
+    "buenas",
+    "buenos dias",
+    "buenos días",
+    "info",
+    "informacion",
+    "información",
+    "precio",
+    "costos",
+    "coste",
+    "costo",
+    "demo",
+    "ayuda",
+  ];
+
+  if (veryShortAllowed.includes(text)) {
+    return false;
+  }
+
+  if (!hasBusinessIntent && countWords(text) >= 4) {
+    return true;
+  }
+
+  return false;
+}
+
 function getOriginForProvider(req) {
-  return req.headers.origin || process.env.FRONTEND_URL || "http://localhost:5173";
+  return (
+    req.headers.origin || process.env.FRONTEND_URL || "http://localhost:5173"
+  );
 }
 
 function detectClientType(req) {
@@ -479,6 +608,12 @@ function getTenantAssistantPrompt(tenant, assistantId) {
   }
 
   return "";
+}
+
+function buildOffTopicReply(assistantId = "isis") {
+  const assistant = getAssistantConfig(assistantId);
+
+  return `Soy ${assistant.name} y estoy enfocada en ${assistant.role.toLowerCase()}. Puedo ayudarte con información sobre el servicio, soporte, demo, precios o el siguiente paso correcto.`;
 }
 
 function buildBaseContext(tenant) {
@@ -1070,7 +1205,9 @@ app.post(
   async (req, res) => {
     try {
       if (!process.env.OPENAI_API_KEY) {
-        return res.status(500).json({ error: "Falta configurar OPENAI_API_KEY" });
+        return res
+          .status(500)
+          .json({ error: "Falta configurar OPENAI_API_KEY" });
       }
 
       if (!req.file) {
@@ -1080,7 +1217,9 @@ app.post(
       const transcript = await transcribeAudioWithOpenAI(req.file);
 
       if (!transcript) {
-        return res.status(422).json({ error: "No se pudo transcribir el audio" });
+        return res
+          .status(422)
+          .json({ error: "No se pudo transcribir el audio" });
       }
 
       return res.json({ transcript });
@@ -1164,6 +1303,45 @@ app.post("/chat", requireTenant, async (req, res) => {
     const interested = detectInterest(message);
     const requestedDemo = wantsDemo(message);
 
+    const isOffTopic = detectOffTopicMessage(message);
+
+    if (isOffTopic) {
+      const reply = buildOffTopicReply(selectedAssistantId);
+      const speak = shouldSpeakReply(reply, channel, "");
+
+      appendConversationMessage(conversationId, "user", message);
+      appendConversationMessage(conversationId, "assistant", reply);
+      setStoredAssistant(conversationId, selectedAssistantId);
+
+      return res.json({
+        reply,
+        ttsEnabled: speak,
+        ttsText: speak ? reply : "",
+        switched,
+        transitionText,
+        previousAssistantId,
+        previousAssistantName: previousAssistant.name,
+        assistantId: selectedAssistantId,
+        assistantName: selectedAssistant.name,
+        assistantColor: selectedAssistant.color,
+        voiceAssistant: selectedAssistantId,
+        detectedIntent: routing.intent,
+        providerUsed: "offtopic-guard",
+        clientType: detectClientType(req),
+        actions: {
+          leadSaved: false,
+          webhookSent: false,
+          mergedLead: {
+            name: null,
+            phone: null,
+            interested: false,
+            requestedDemo: false,
+          },
+        },
+        memorySize: getConversationHistory(conversationId).length,
+      });
+    }
+
     const ai = await generateAIReply({
       tenant,
       assistantId: selectedAssistantId,
@@ -1173,8 +1351,7 @@ app.post("/chat", requireTenant, async (req, res) => {
       req,
     });
 
-    const rawReply =
-      ai.reply || "Hubo un problema al generar la respuesta.";
+    const rawReply = ai.reply || "Hubo un problema al generar la respuesta.";
 
     const reply = transitionText
       ? `${transitionText} ${rawReply}`.trim()
