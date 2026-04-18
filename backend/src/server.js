@@ -275,6 +275,12 @@ function detectOffTopicMessage(message = "") {
     "religión",
     "politica",
     "política",
+    "capital de",
+    "presidente de",
+    "quien descubrio",
+    "quién descubrió",
+    "cuanto es",
+    "cuánto es",
   ];
 
   if (obviousOffTopic.some((term) => text.includes(term))) {
@@ -610,10 +616,23 @@ function getTenantAssistantPrompt(tenant, assistantId) {
   return "";
 }
 
-function buildOffTopicReply(assistantId = "isis") {
-  const assistant = getAssistantConfig(assistantId);
+function buildOffTopicReplyFromCurrentAssistant(currentAssistantId = "isis") {
+  const assistant = getAssistantConfig(currentAssistantId);
 
-  return `Soy ${assistant.name} y estoy enfocada en ${assistant.role.toLowerCase()}. Puedo ayudarte con información sobre el servicio, soporte, demo, precios o el siguiente paso correcto.`;
+  const focusByAssistant = {
+    isis: "recepción inicial, orientación del servicio y siguiente paso",
+    osiris: "recepción inicial, organización de la atención y siguiente paso",
+    freyja: "ventas, precios, demo y contacto comercial",
+    thor: "ventas, cotización, interés comercial y cierre",
+    atenea: "soporte, funciones, dudas técnicas e integración",
+    artemisa: "soporte guiado, ayuda práctica y resolución de bloqueos",
+  };
+
+  const focus =
+    focusByAssistant[currentAssistantId] ||
+    "información del servicio, soporte, demo o contacto";
+
+  return `Prefiero mantenerme enfocada en ${focus}. Si quieres, puedo ayudarte con eso.`;
 }
 
 function buildBaseContext(tenant) {
@@ -1284,6 +1303,46 @@ app.post("/chat", requireTenant, async (req, res) => {
         ? requestedAssistantId
         : getStoredAssistant(conversationId);
 
+    const isOffTopic = detectOffTopicMessage(message);
+
+    if (isOffTopic) {
+      const currentAssistant = getAssistantConfig(previousAssistantId);
+      const reply = buildOffTopicReplyFromCurrentAssistant(previousAssistantId);
+      const speak = shouldSpeakReply(reply, channel, "");
+
+      appendConversationMessage(conversationId, "user", message);
+      appendConversationMessage(conversationId, "assistant", reply);
+      setStoredAssistant(conversationId, previousAssistantId);
+
+      return res.json({
+        reply,
+        ttsEnabled: speak,
+        ttsText: speak ? reply : "",
+        switched: false,
+        transitionText: "",
+        previousAssistantId,
+        previousAssistantName: currentAssistant.name,
+        assistantId: previousAssistantId,
+        assistantName: currentAssistant.name,
+        assistantColor: currentAssistant.color,
+        voiceAssistant: previousAssistantId,
+        detectedIntent: "offtopic",
+        providerUsed: "offtopic-guard",
+        clientType: detectClientType(req),
+        actions: {
+          leadSaved: false,
+          webhookSent: false,
+          mergedLead: {
+            name: null,
+            phone: null,
+            interested: false,
+            requestedDemo: false,
+          },
+        },
+        memorySize: getConversationHistory(conversationId).length,
+      });
+    }
+
     const routing = routeAssistant({
       message,
       currentAssistantId: previousAssistantId,
@@ -1302,45 +1361,6 @@ app.post("/chat", requireTenant, async (req, res) => {
     const phone = extractPhone(message);
     const interested = detectInterest(message);
     const requestedDemo = wantsDemo(message);
-
-    const isOffTopic = detectOffTopicMessage(message);
-
-    if (isOffTopic) {
-      const reply = buildOffTopicReply(selectedAssistantId);
-      const speak = shouldSpeakReply(reply, channel, "");
-
-      appendConversationMessage(conversationId, "user", message);
-      appendConversationMessage(conversationId, "assistant", reply);
-      setStoredAssistant(conversationId, selectedAssistantId);
-
-      return res.json({
-        reply,
-        ttsEnabled: speak,
-        ttsText: speak ? reply : "",
-        switched,
-        transitionText,
-        previousAssistantId,
-        previousAssistantName: previousAssistant.name,
-        assistantId: selectedAssistantId,
-        assistantName: selectedAssistant.name,
-        assistantColor: selectedAssistant.color,
-        voiceAssistant: selectedAssistantId,
-        detectedIntent: routing.intent,
-        providerUsed: "offtopic-guard",
-        clientType: detectClientType(req),
-        actions: {
-          leadSaved: false,
-          webhookSent: false,
-          mergedLead: {
-            name: null,
-            phone: null,
-            interested: false,
-            requestedDemo: false,
-          },
-        },
-        memorySize: getConversationHistory(conversationId).length,
-      });
-    }
 
     const ai = await generateAIReply({
       tenant,
