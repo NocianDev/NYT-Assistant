@@ -29,7 +29,7 @@ const PORT = process.env.PORT || 3000;
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: {
-    fileSize: 20 * 1024 * 1024,
+    fileSize: 12 * 1024 * 1024,
   },
 });
 
@@ -68,7 +68,7 @@ app.use(
   })
 );
 
-app.use(express.json({ limit: "2mb" }));
+app.use(express.json());
 
 app.get("/", (req, res) => {
   res.send("NYT Assistant Backend OK");
@@ -95,53 +95,19 @@ function countWords(text = "") {
     .filter(Boolean).length;
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
 function buildSpokenVersion(fullReply = "") {
   const clean = fullReply.replace(/\s+/g, " ").trim();
+
   if (!clean) return "";
 
   const words = clean.split(" ");
 
-  if (words.length <= 18) {
+  if (words.length <= 40) {
     return clean;
   }
 
-  const shortPreview = words.slice(0, 12).join(" ");
+  const shortPreview = words.slice(0, 28).join(" ");
   return `${shortPreview}. Te dejé el resto en pantalla para que lo leas con calma.`;
-}
-
-function normalizeTranscriptText(text = "") {
-  return text
-    .replace(/\s+/g, " ")
-    .replace(/^[.,;:¡!¿?\-_\s]+/, "")
-    .trim();
-}
-
-function transcriptLooksUseful(text = "") {
-  const normalized = normalizeTranscriptText(text).toLowerCase();
-  if (!normalized) return false;
-
-  const junk = [
-    "eh",
-    "em",
-    "mmm",
-    "mm",
-    "ajá",
-    "aja",
-    "sí",
-    "si",
-    "ok",
-    "okay",
-    "hola",
-  ];
-
-  if (normalized.length < 2) return false;
-  if (normalized.length <= 3 && junk.includes(normalized)) return false;
-
-  return true;
 }
 
 function extractPhone(text) {
@@ -274,8 +240,8 @@ function shouldSpeakReply(reply = "", channel = "chat", transitionText = "") {
     "whatsapp",
   ].some((p) => text.includes(p));
 
-  if (words <= 18) return true;
-  if (words <= 28 && hasPriorityIntent) return true;
+  if (words <= 34) return true;
+  if (words <= 55 && hasPriorityIntent) return true;
 
   return false;
 }
@@ -403,6 +369,8 @@ Tu función es recepción inicial.
 Hablas con elegancia, claridad y seguridad.
 Tu objetivo es recibir a la persona, entender qué necesita y dirigirla al asistente adecuado cuando haga falta.
 No suenes robótica. No digas que eres una IA.
+No te salgas a conversaciones generales.
+Si el usuario se desvía del objetivo, vuelve a enfocar la conversación en atención inicial, necesidades y siguiente paso.
 `,
   },
   freyja: {
@@ -418,6 +386,8 @@ Tu función es ventas consultivas.
 Tu tono es persuasivo, seguro, profesional y natural.
 Tu objetivo es detectar interés comercial, explicar el valor del servicio y llevar la conversación a cotización, demo o contacto.
 Cuando haya interés real, pide nombre y WhatsApp con naturalidad.
+No te desvíes a temas que no ayuden a vender, orientar o calificar al prospecto.
+Si el usuario cambia de tema, responde breve y vuelve a llevarlo al servicio o la oportunidad comercial.
 `,
   },
   atenea: {
@@ -432,6 +402,8 @@ Eres Atenea de NYT Assistant.
 Tu función es soporte y orientación.
 Explicas con claridad, calma, inteligencia y orden.
 Tu objetivo es resolver dudas, explicar funciones y quitar fricción.
+No te apartes del tema técnico o de orientación.
+Si el usuario se desvía, recuérdale que estás para ayudar con soporte y redirígelo con amabilidad.
 `,
   },
   osiris: {
@@ -446,6 +418,8 @@ Eres Osiris de NYT Assistant.
 Tu función es recepción ejecutiva.
 Tu tono es sobrio, firme, profesional y confiable.
 Tu objetivo es ordenar la conversación y encaminar correctamente al usuario.
+No entres en conversaciones secundarias o irrelevantes.
+Si el usuario se desvía, vuelve a centrarlo en lo que necesita y en el siguiente paso.
 `,
   },
   thor: {
@@ -460,6 +434,8 @@ Eres Thor de NYT Assistant.
 Tu función es ventas directas.
 Hablas con energía, seguridad y enfoque a cierre.
 Tu objetivo es llevar la conversación a una acción concreta: cotizar, captar interés, pedir contacto o mover a demo.
+No te desvíes a temas ajenos a ventas.
+Si el usuario cambia de tema, responde corto y vuelve a llevar la conversación a una acción comercial.
 `,
   },
   artemisa: {
@@ -474,6 +450,8 @@ Eres Artemisa de NYT Assistant.
 Tu función es soporte cálido y guiado.
 Explicas con paciencia, cercanía y claridad.
 Tu objetivo es ayudar, acompañar y resolver bloqueos sin sonar técnica de más.
+No desarrolles conversaciones fuera del soporte o la orientación.
+Si el usuario se sale del enfoque, redirígelo con amabilidad al problema principal.
 `,
   },
 };
@@ -518,12 +496,10 @@ Objetivo general:
 - mover la conversación al siguiente paso correcto
 
 Servicios base:
+- atención automatizada
 - asistentes con IA
-- automatización
-- chatbots
-- atención digital
-- flujos de ventas
-- integraciones
+- captación de leads
+- soporte comercial
 
 Tono general: ${tone}
 
@@ -534,6 +510,10 @@ Reglas globales:
 - evita respuestas genéricas
 - en voz responde más breve
 - si la respuesta es larga, resume y deja el resto para lectura
+- mantente enfocada en el servicio principal del negocio
+- evita hablar de temas ajenos al objetivo comercial o de atención
+- si el usuario intenta llevar la conversación a otro tema, responde breve y redirígelo al propósito principal
+- prioriza siempre ayudar dentro del rol actual del asistente
 `;
 }
 
@@ -565,6 +545,12 @@ INSTRUCCIONES OPERATIVAS:
 - no expliques el sistema interno
 - si detectas intención de venta clara, avanza
 - si detectas una duda o problema técnico, orienta o deja lista la transición
+- no te salgas del tema principal del asistente actual
+- no desarrolles conversaciones largas sobre temas generales, curiosidades o asuntos ajenos al servicio
+- si el usuario se desvía del enfoque, recuérdale tu función y redirígelo con naturalidad
+- si el usuario insiste en temas ajenos, responde breve y vuelve al propósito principal
+- prioriza siempre el servicio principal, la orientación útil y el siguiente paso correcto
+- evita respuestas innecesariamente largas
 `;
 }
 
@@ -684,7 +670,6 @@ async function openRouterChatCompletion({
   messages,
   temperature = 0.6,
   origin,
-  maxTokens = 120,
 }) {
   const response = await axios.post(
     "https://openrouter.ai/api/v1/chat/completions",
@@ -692,7 +677,7 @@ async function openRouterChatCompletion({
       model,
       messages,
       temperature,
-      max_tokens: maxTokens,
+      max_tokens: 120,
     },
     {
       headers: {
@@ -701,7 +686,7 @@ async function openRouterChatCompletion({
         "HTTP-Referer": origin,
         "X-Title": "NYT Assistant Backend",
       },
-      timeout: 28000,
+      timeout: 25000,
     }
   );
 
@@ -713,7 +698,6 @@ async function openAIResponsesText({
   systemPrompt,
   history,
   userMessage,
-  maxOutputTokens = 120,
 }) {
   const input = [
     {
@@ -735,14 +719,14 @@ async function openAIResponsesText({
     {
       model,
       input,
-      max_output_tokens: maxOutputTokens,
+      max_output_tokens: 120,
     },
     {
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         "Content-Type": "application/json",
       },
-      timeout: 28000,
+      timeout: 25000,
     }
   );
 
@@ -750,15 +734,7 @@ async function openAIResponsesText({
   return text || "";
 }
 
-async function transcribeAudioWithOpenAI(file, clientType = "desktop") {
-  const model =
-    process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe";
-
-  const prompt =
-    clientType === "mobile"
-      ? "Transcribe en español de México. Corrige ligeramente pausas, muletillas y ruido, pero conserva el significado."
-      : "Transcribe en español de México.";
-
+async function transcribeAudioWithOpenAI(file) {
   const formData = new FormData();
 
   formData.append("file", file.buffer, {
@@ -766,9 +742,11 @@ async function transcribeAudioWithOpenAI(file, clientType = "desktop") {
     contentType: file.mimetype || "audio/webm",
   });
 
-  formData.append("model", model);
+  formData.append(
+    "model",
+    process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-mini-transcribe"
+  );
   formData.append("language", "es");
-  formData.append("prompt", prompt);
 
   const response = await axios.post(
     "https://api.openai.com/v1/audio/transcriptions",
@@ -780,36 +758,11 @@ async function transcribeAudioWithOpenAI(file, clientType = "desktop") {
       },
       maxBodyLength: Infinity,
       maxContentLength: Infinity,
-      timeout: 60000,
+      timeout: 45000,
     }
   );
 
-  return normalizeTranscriptText(response?.data?.text || "");
-}
-
-async function transcribeAudioWithRetry(file, clientType = "desktop") {
-  let lastError = null;
-
-  for (let attempt = 1; attempt <= 2; attempt += 1) {
-    try {
-      const transcript = await transcribeAudioWithOpenAI(file, clientType);
-      if (transcriptLooksUseful(transcript)) {
-        return transcript;
-      }
-
-      if (attempt === 1) {
-        await sleep(450);
-      }
-    } catch (error) {
-      lastError = error;
-      if (attempt === 1) {
-        await sleep(600);
-      }
-    }
-  }
-
-  if (lastError) throw lastError;
-  return "";
+  return response?.data?.text?.trim() || "";
 }
 
 async function synthesizeWithElevenLabs(text, assistantId = "isis") {
@@ -828,9 +781,9 @@ async function synthesizeWithElevenLabs(text, assistantId = "isis") {
       text,
       model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_flash_v2_5",
       voice_settings: {
-        stability: 0.52,
-        similarity_boost: 0.82,
-        style: 0.18,
+        stability: 0.45,
+        similarity_boost: 0.8,
+        style: 0.15,
         use_speaker_boost: true,
         speed: 1.0,
       },
@@ -842,7 +795,7 @@ async function synthesizeWithElevenLabs(text, assistantId = "isis") {
         "Content-Type": "application/json",
         Accept: "audio/mpeg",
       },
-      timeout: 35000,
+      timeout: 30000,
     }
   );
 
@@ -888,15 +841,12 @@ Instrucciones del canal:
   const openRouterModel =
     process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 
-  const maxTokens = channel === "voice" ? 90 : 140;
-
   if (clientType === "mobile") {
     const text = await openAIResponsesText({
       model: openAIModel,
       systemPrompt,
       history: normalizedHistory,
       userMessage: message,
-      maxOutputTokens: maxTokens,
     });
 
     return {
@@ -921,7 +871,6 @@ Instrucciones del canal:
       messages,
       temperature: 0.6,
       origin,
-      maxTokens,
     });
 
     if (!text) {
@@ -940,7 +889,6 @@ Instrucciones del canal:
       systemPrompt,
       history: normalizedHistory,
       userMessage: message,
-      maxOutputTokens: maxTokens,
     });
 
     return {
@@ -998,7 +946,6 @@ async function generateLeadSummary({ messages }) {
       systemPrompt,
       history: [],
       userMessage: userPrompt,
-      maxOutputTokens: 70,
     });
 
     return summary || "";
@@ -1130,10 +1077,9 @@ app.post(
         return res.status(400).json({ error: "No se envió audio" });
       }
 
-      const clientType = detectClientType(req);
-      const transcript = await transcribeAudioWithRetry(req.file, clientType);
+      const transcript = await transcribeAudioWithOpenAI(req.file);
 
-      if (!transcriptLooksUseful(transcript)) {
+      if (!transcript) {
         return res.status(422).json({ error: "No se pudo transcribir el audio" });
       }
 
@@ -1159,7 +1105,6 @@ app.post("/voice/speak", requireTenant, async (req, res) => {
     const audioBuffer = await synthesizeWithElevenLabs(text, assistantId);
 
     res.setHeader("Content-Type", "audio/mpeg");
-    res.setHeader("Cache-Control", "no-store");
     return res.send(audioBuffer);
   } catch (error) {
     console.error(
@@ -1195,15 +1140,13 @@ app.post("/chat", requireTenant, async (req, res) => {
       return res.status(400).json({ error: "Falta conversationId" });
     }
 
-    const cleanedMessage = normalizeTranscriptText(message);
-
     const previousAssistantId =
       requestedAssistantId && ASSISTANT_IDS.includes(requestedAssistantId)
         ? requestedAssistantId
         : getStoredAssistant(conversationId);
 
     const routing = routeAssistant({
-      message: cleanedMessage,
+      message,
       currentAssistantId: previousAssistantId,
     });
 
@@ -1216,15 +1159,15 @@ app.post("/chat", requireTenant, async (req, res) => {
       ? buildTransitionText(previousAssistantId, selectedAssistantId)
       : "";
 
-    const name = extractName(cleanedMessage);
-    const phone = extractPhone(cleanedMessage);
-    const interested = detectInterest(cleanedMessage);
-    const requestedDemo = wantsDemo(cleanedMessage);
+    const name = extractName(message);
+    const phone = extractPhone(message);
+    const interested = detectInterest(message);
+    const requestedDemo = wantsDemo(message);
 
     const ai = await generateAIReply({
       tenant,
       assistantId: selectedAssistantId,
-      message: cleanedMessage,
+      message,
       conversationId,
       channel,
       req,
@@ -1237,14 +1180,14 @@ app.post("/chat", requireTenant, async (req, res) => {
       ? `${transitionText} ${rawReply}`.trim()
       : rawReply;
 
-    appendConversationMessage(conversationId, "user", cleanedMessage);
+    appendConversationMessage(conversationId, "user", message);
     appendConversationMessage(conversationId, "assistant", reply);
     setStoredAssistant(conversationId, selectedAssistantId);
 
     const actions = await handleBusinessActions({
       tenant,
       conversationId,
-      message: cleanedMessage,
+      message,
       reply,
       selectedAssistantId,
       name,

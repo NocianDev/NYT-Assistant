@@ -10,20 +10,10 @@ type Props = {
 };
 
 declare global {
-  interface Window {
-    SpeechRecognition?: any;
-    webkitSpeechRecognition?: any;
-  }
-
   interface PermissionDescriptor {
     name: PermissionName | "microphone";
   }
 }
-
-const SpeechRecognitionAPI =
-  typeof window !== "undefined"
-    ? window.SpeechRecognition || window.webkitSpeechRecognition
-    : null;
 
 const pulseKeyframes = `
 @keyframes hmVoicePulse {
@@ -146,7 +136,6 @@ export default function VoiceWidgetPanel({
     typeof window !== "undefined" ? window.innerWidth < 900 : false
   );
 
-  const recognitionRef = useRef<any>(null);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
@@ -163,13 +152,16 @@ export default function VoiceWidgetPanel({
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
 
+  const silenceMonitorRafRef = useRef<number | null>(null);
+  const analyserContextRef = useRef<AudioContext | null>(null);
+  const analyserSourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const analyserNodeRef = useRef<AnalyserNode | null>(null);
+
   const conversationIdRef = useRef<string>(
     `voice-widget-${assistantId}-${Date.now()}-${Math.random()
       .toString(36)
       .slice(2)}`
   );
-
-  const mobileModeRef = useRef<boolean>(false);
 
   useEffect(() => {
     const styleTag = document.createElement("style");
@@ -182,14 +174,7 @@ export default function VoiceWidgetPanel({
   }, []);
 
   useEffect(() => {
-    const mobile = isMobileDevice();
-    mobileModeRef.current = mobile;
-
-    if (!mobile && !SpeechRecognitionAPI) {
-      setUnsupported(true);
-    }
-
-    if (mobile && !navigator.mediaDevices?.getUserMedia) {
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
       setUnsupported(true);
     }
   }, []);
@@ -280,18 +265,32 @@ export default function VoiceWidgetPanel({
     return `${mins}:${secs}`;
   }
 
-  function stopRecognition() {
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.onend = null;
-        recognitionRef.current.onerror = null;
-        recognitionRef.current.stop();
-      } catch {}
-      recognitionRef.current = null;
+  function clearSilenceMonitor() {
+    if (silenceMonitorRafRef.current) {
+      cancelAnimationFrame(silenceMonitorRafRef.current);
+      silenceMonitorRafRef.current = null;
     }
+
+    try {
+      analyserSourceRef.current?.disconnect();
+    } catch {}
+
+    try {
+      analyserNodeRef.current?.disconnect();
+    } catch {}
+
+    try {
+      analyserContextRef.current?.close();
+    } catch {}
+
+    analyserSourceRef.current = null;
+    analyserNodeRef.current = null;
+    analyserContextRef.current = null;
   }
 
   function stopRecorder() {
+    clearSilenceMonitor();
+
     if (recorderRef.current) {
       try {
         if (recorderRef.current.state !== "inactive") {
@@ -335,7 +334,6 @@ export default function VoiceWidgetPanel({
 
   function hardStopEverything() {
     clearRelistenTimer();
-    stopRecognition();
     stopRecorder();
     stopStream();
     cleanupSpeech();
@@ -372,7 +370,7 @@ export default function VoiceWidgetPanel({
     };
   }, []);
 
-  function scheduleRelisten(delay = 1200) {
+  function scheduleRelisten(delay = 1800) {
     clearRelistenTimer();
 
     relistenTimerRef.current = window.setTimeout(() => {
@@ -382,11 +380,7 @@ export default function VoiceWidgetPanel({
       if (speakingRef.current) return;
       if (busyRef.current) return;
 
-      if (mobileModeRef.current) {
-        void startMobileRecording();
-      } else {
-        startDesktopListening();
-      }
+      void startAudioRecording();
     }, delay);
   }
 
@@ -405,11 +399,12 @@ export default function VoiceWidgetPanel({
   function shouldIgnoreTranscript(rawText: string) {
     const normalized = normalizeSpokenText(rawText);
 
-    if (!normalized || normalized.length < 3) {
+    if (!normalized || normalized.length < 2) {
       return true;
     }
 
     const previous = lastAcceptedTranscriptRef.current;
+
     if (normalized === previous) {
       return true;
     }
@@ -417,7 +412,7 @@ export default function VoiceWidgetPanel({
     if (
       previous &&
       (normalized.includes(previous) || previous.includes(normalized)) &&
-      normalized.length < 12
+      normalized.length < 10
     ) {
       return true;
     }
@@ -587,7 +582,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 1800 : 1200);
+        scheduleRelisten(isMobileDevice() ? 2400 : 2200);
       } else {
         setVoiceState("idle");
       }
@@ -613,7 +608,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 2000 : 1500);
+        scheduleRelisten(isMobileDevice() ? 2600 : 2400);
       }
     }
   }
@@ -653,13 +648,11 @@ export default function VoiceWidgetPanel({
           },
           body: formData,
         },
-        50000
+        60000
       );
 
       if (!res.ok) {
-        throw new Error(
-          data?.error || `Error /voice/transcribe (${res.status})`
-        );
+        throw new Error(data?.error || `Error /voice/transcribe (${res.status})`);
       }
 
       const text = data?.transcript?.trim() || "";
@@ -675,7 +668,7 @@ export default function VoiceWidgetPanel({
           autoContinueRef.current &&
           !stoppedRef.current
         ) {
-          scheduleRelisten(isMobileDevice() ? 1400 : 1000);
+          scheduleRelisten(isMobileDevice() ? 1800 : 1600);
         }
         return;
       }
@@ -696,99 +689,12 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 2200 : 1500);
+        scheduleRelisten(isMobileDevice() ? 2400 : 2200);
       }
     }
   }
 
-  function startDesktopListening() {
-    if (!SpeechRecognitionAPI || busyRef.current || speakingRef.current) return;
-
-    stopRecognition();
-
-    const recognition = new SpeechRecognitionAPI();
-    let gotResult = false;
-
-    recognition.lang = "es-MX";
-    recognition.continuous = false;
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    recognition.onstart = () => {
-      setVoiceState("listening");
-    };
-
-    recognition.onresult = async (event: any) => {
-      const text = event?.results?.[0]?.[0]?.transcript?.trim() || "";
-      gotResult = true;
-      setTranscript(text);
-
-      if (!text || shouldIgnoreTranscript(text)) {
-        setVoiceState("idle");
-        scheduleRelisten(900);
-        return;
-      }
-
-      await sendVoiceTextToAssistant(text);
-    };
-
-    recognition.onerror = (event: any) => {
-      console.error("SpeechRecognition error:", event);
-      setVoiceState("idle");
-
-      if (
-        event?.error === "no-speech" ||
-        event?.error === "aborted" ||
-        event?.error === "network"
-      ) {
-        if (
-          callActiveRef.current &&
-          autoContinueRef.current &&
-          !stoppedRef.current
-        ) {
-          scheduleRelisten(1100);
-        }
-        return;
-      }
-
-      setLastResponse("No se pudo reconocer la voz. Intenta de nuevo.");
-    };
-
-    recognition.onend = () => {
-      recognitionRef.current = null;
-
-      if (!callActiveRef.current || stoppedRef.current) {
-        setVoiceState("idle");
-        return;
-      }
-
-      if (
-        !gotResult &&
-        autoContinueRef.current &&
-        !busyRef.current &&
-        !speakingRef.current
-      ) {
-        scheduleRelisten(900);
-        return;
-      }
-
-      if (!busyRef.current && !speakingRef.current) {
-        setVoiceState("idle");
-      }
-    };
-
-    recognitionRef.current = recognition;
-
-    try {
-      recognition.start();
-    } catch (error) {
-      console.error("Error iniciando SpeechRecognition:", error);
-      setVoiceState("idle");
-      scheduleRelisten(1200);
-    }
-  }
-
-  async function startMobileRecording() {
+  async function startAudioRecording() {
     if (busyRef.current || speakingRef.current) return;
 
     try {
@@ -806,13 +712,13 @@ export default function VoiceWidgetPanel({
           echoCancellation: true,
           noiseSuppression: true,
           autoGainControl: true,
+          channelCount: 1,
         },
       });
 
       streamRef.current = stream;
       setMicPermission("granted");
       setShowPermissionScreen(false);
-
       audioChunksRef.current = [];
 
       let mimeType = "";
@@ -832,8 +738,99 @@ export default function VoiceWidgetPanel({
 
       recorderRef.current = recorder;
 
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as any).webkitAudioContext;
+
+      let audioContext: AudioContext | null = null;
+      let source: MediaStreamAudioSourceNode | null = null;
+      let analyser: AnalyserNode | null = null;
+      let dataArray: Uint8Array<ArrayBuffer> | null = null;
+
+      if (AudioContextCtor) {
+        audioContext = new AudioContextCtor();
+        source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 2048;
+        source.connect(analyser);
+        dataArray = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+
+        analyserContextRef.current = audioContext;
+        analyserSourceRef.current = source;
+        analyserNodeRef.current = analyser;
+      }
+
+      let startedAt = 0;
+      let silenceStartedAt: number | null = null;
+
+      const MIN_RECORD_MS = 1400;
+      const MAX_RECORD_MS = isMobileLayout ? 15000 : 12000;
+      const END_SILENCE_MS = isMobileLayout ? 1100 : 950;
+      const SILENCE_THRESHOLD = isMobileLayout ? 6 : 7;
+
+      function stopAndCleanup() {
+        clearSilenceMonitor();
+
+        try {
+          if (recorder.state === "recording") {
+            recorder.stop();
+          }
+        } catch {}
+      }
+
+      function monitorSilence() {
+        if (!callActiveRef.current || stoppedRef.current) {
+          stopAndCleanup();
+          return;
+        }
+
+        if (recorder.state !== "recording") return;
+
+        const now = Date.now();
+        const elapsed = now - startedAt;
+
+        if (elapsed >= MAX_RECORD_MS) {
+          stopAndCleanup();
+          return;
+        }
+
+        if (analyser && dataArray) {
+          analyser.getByteTimeDomainData(dataArray);
+
+          let sum = 0;
+          for (let i = 0; i < dataArray.length; i += 1) {
+            sum += Math.abs(dataArray[i] - 128);
+          }
+
+          const average = sum / dataArray.length;
+
+          if (average < SILENCE_THRESHOLD) {
+            if (silenceStartedAt === null) {
+              silenceStartedAt = now;
+            }
+
+            const silenceElapsed = now - silenceStartedAt;
+
+            if (elapsed >= MIN_RECORD_MS && silenceElapsed >= END_SILENCE_MS) {
+              stopAndCleanup();
+              return;
+            }
+          } else {
+            silenceStartedAt = null;
+          }
+        }
+
+        silenceMonitorRafRef.current = requestAnimationFrame(monitorSilence);
+      }
+
       recorder.onstart = () => {
+        startedAt = Date.now();
+        silenceStartedAt = null;
         setVoiceState("recording");
+
+        window.setTimeout(() => {
+          silenceMonitorRafRef.current = requestAnimationFrame(monitorSilence);
+        }, 250);
       };
 
       recorder.ondataavailable = (event) => {
@@ -843,13 +840,15 @@ export default function VoiceWidgetPanel({
       };
 
       recorder.onstop = async () => {
+        clearSilenceMonitor();
+
         const chunks = audioChunksRef.current;
         audioChunksRef.current = [];
         stopStream();
 
         if (!chunks.length) {
           setVoiceState("idle");
-          scheduleRelisten(1400);
+          scheduleRelisten(1800);
           return;
         }
 
@@ -862,26 +861,14 @@ export default function VoiceWidgetPanel({
 
       recorder.onerror = (event: any) => {
         console.error("MediaRecorder error:", event);
+        clearSilenceMonitor();
         stopStream();
         setVoiceState("idle");
         setLastResponse("El navegador falló al grabar el audio.");
-        scheduleRelisten(1800);
+        scheduleRelisten(2400);
       };
 
       recorder.start();
-
-      const recordDuration = isMobileLayout ? 8000 : 6500;
-
-      window.setTimeout(() => {
-        if (
-          recorderRef.current &&
-          recorderRef.current.state === "recording" &&
-          callActiveRef.current &&
-          !stoppedRef.current
-        ) {
-          recorderRef.current.stop();
-        }
-      }, recordDuration);
     } catch (error: any) {
       console.error("Error al acceder al micrófono:", error);
 
@@ -931,11 +918,7 @@ export default function VoiceWidgetPanel({
     setLastResponse(`La llamada con ${activeAssistantName} ha comenzado.`);
     setShowPermissionScreen(false);
 
-    if (mobileModeRef.current) {
-      void startMobileRecording();
-    } else {
-      startDesktopListening();
-    }
+    void startAudioRecording();
   }
 
   const permissionHelp =
@@ -1155,9 +1138,8 @@ export default function VoiceWidgetPanel({
                   fontSize: "14px",
                 }}
               >
-                <strong>Consejo:</strong> en celular habla cerca del micrófono,
-                espera medio segundo antes de empezar y usa audífonos si dejas la
-                conversación continua encendida.
+                <strong>Consejo:</strong> habla normal y con el micrófono cerca.
+                Ya no hace falta usar otro sistema distinto en compu y celular.
               </div>
 
               <button
