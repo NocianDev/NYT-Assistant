@@ -1,0 +1,64 @@
+CAMBIOS APLICADOS EN ESTA VERSIÓN
+
+1. Diseño visual premium
+- Se agregó un fondo HTML animado en 3D con cubos, líneas rojas, glow, grid y movimiento tipo la referencia visual.
+- Nuevos archivos:
+  frontend/src/components/NeonCubeBackground.tsx
+  frontend/src/components/NeonCubeBackground.css
+- La página principal ahora presenta la IA como producto vendible: voz, chat, leads, atención 24/7 y llamada de prueba.
+
+2. Página más clara para vender la IA
+- Hero principal actualizado para explicar rápido qué hace NYT Assistant.
+- Botones más directos: Probar llamada / Ver cómo funciona.
+- Sección de demo renombrada como llamada de prueba.
+- Textos menos genéricos y más orientados a valor comercial.
+
+3. Voz más cercana a una llamada real
+- Se mantiene el flujo profesional: grabación real del micrófono -> transcripción backend -> respuesta IA -> voz ElevenLabs.
+- Se eliminó el componente viejo basado en speechSynthesis/SpeechRecognition del navegador.
+- VoiceAssistant ahora usa VoiceWidgetPanel para mantener una sola experiencia de voz.
+
+4. Menos tiempos muertos
+- Se redujeron los tiempos de silencio para cortar la grabación más rápido.
+- Se redujo el tiempo para volver a escuchar después de responder.
+- La IA recibe instrucciones para responder en voz con máximo aproximado de 28 palabras.
+- ElevenLabs usa optimize_streaming_latency=3 y audio mp3 más ligero.
+
+5. Interrupción del asistente
+- Se agregó botón Hablar ahora.
+- Si la IA está hablando, este botón corta el audio inmediatamente y vuelve a escuchar.
+- Esto hace que la demo se sienta más como una llamada real.
+
+6. Backend optimizado para frases más concisas
+- Prompts actualizados para respuestas cortas, claras y comerciales.
+- Menos tokens de salida para reducir latencia.
+- Voz configurada con speed 1.08 para sonar más ágil.
+
+7. Build frontend revisado
+- Se ajustaron versiones estables de Vite y React para evitar problemas con Vercel.
+- Build probado correctamente con: npm run build
+
+IMPORTANTE PARA DESPLEGAR
+
+Frontend:
+- En Vercel configura:
+  VITE_API_URL=https://TU-BACKEND.onrender.com
+  VITE_TENANT_ID=nyt_demo_1
+
+Backend:
+- En Render configura:
+  FRONTEND_URL=https://TU-FRONTEND.vercel.app
+  MONGODB_URI=tu_uri_de_mongodb
+  OPENAI_API_KEY=tu_key
+  OPENROUTER_API_KEY=tu_key_opcional
+  ELEVENLABS_API_KEY=tu_key
+  ELEVENLABS_MODEL_ID=eleven_flash_v2_5
+
+Si Vercel pregunta configuración:
+- Root Directory: frontend
+- Build Command: npm run build
+- Output Directory: dist
+
+Si Render pregunta configuración:
+- Root Directory: backend
+- Start Command: npm start

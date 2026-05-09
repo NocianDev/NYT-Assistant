@@ -5,6 +5,7 @@ import LeadsPanel from "./components/LeadsPanel";
 import VoiceWidget from "./components/VoiceWidget";
 import AssistantsHub from "./pages/AssistantsHub";
 import VoiceWidgetPanel from "./components/VoiceWidgetPanel";
+import NeonCubeBackground from "./components/NeonCubeBackground";
 import { ASSISTANTS } from "./data/assistants";
 
 const API_URL =
@@ -12,7 +13,7 @@ const API_URL =
 
 function HomePage() {
   const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < 960 : false
+    typeof window !== "undefined" ? window.innerWidth < 960 : false,
   );
   const [selectedDemoId, setSelectedDemoId] = useState("isis");
 
@@ -24,7 +25,7 @@ function HomePage() {
 
   const selectedDemoAssistant = useMemo(
     () => ASSISTANTS.find((a) => a.id === selectedDemoId) || ASSISTANTS[0],
-    [selectedDemoId]
+    [selectedDemoId],
   );
 
   const sectionWrap: React.CSSProperties = {
@@ -61,8 +62,13 @@ function HomePage() {
           alignItems: isMobile ? "flex-start" : "center",
           justifyContent: "space-between",
           gap: "16px",
-          position: "relative",
-          zIndex: 3,
+          position: "sticky",
+          top: 0,
+          zIndex: 10,
+          background: "rgba(5,1,3,0.48)",
+          borderBottom: "1px solid rgba(255,255,255,0.08)",
+          backdropFilter: "blur(18px)",
+          WebkitBackdropFilter: "blur(18px)",
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -71,7 +77,7 @@ function HomePage() {
               width: "42px",
               height: "42px",
               borderRadius: "14px",
-              background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
+              background: "linear-gradient(135deg, #ff1744, #780014)",
               display: "grid",
               placeItems: "center",
               color: "#fff",
@@ -157,13 +163,7 @@ function HomePage() {
     );
   }
 
-  function BenefitCard({
-    title,
-    text,
-  }: {
-    title: string;
-    text: string;
-  }) {
+  function BenefitCard({ title, text }: { title: string; text: string }) {
     return (
       <div
         style={{
@@ -363,10 +363,10 @@ function HomePage() {
                 letterSpacing: "-0.03em",
               }}
             >
-              Demo interactiva
+              Llamada de prueba
             </div>
             <div style={{ color: "rgba(255,255,255,0.62)", fontSize: "14px" }}>
-              Conoce cómo responde, guía y atiende desde la primera interacción.
+              Prueba la experiencia como si fuera una llamada comercial real.
             </div>
           </div>
 
@@ -384,7 +384,7 @@ function HomePage() {
               width: isMobile ? "100%" : "auto",
             }}
           >
-            Ver experiencia completa
+            Abrir modo pantalla completa
           </a>
         </div>
 
@@ -446,66 +446,406 @@ function HomePage() {
     <div
       style={{
         minHeight: "100vh",
-        background:
-          "radial-gradient(circle at top left, rgba(255,42,42,0.16), transparent 22%), radial-gradient(circle at top right, rgba(120,0,0,0.22), transparent 26%), linear-gradient(180deg, #050505 0%, #0a0a0a 35%, #111111 100%)",
+        background: "#050103",
         color: "#fff",
         fontFamily:
           'Inter, Arial, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+        position: "relative",
+        overflow: "hidden",
       }}
     >
-      <TopNav />
+      <NeonCubeBackground />
+      <div
+        style={{
+          position: "relative",
+          zIndex: 2,
+          background:
+            "linear-gradient(180deg, rgba(3,1,2,0.18) 0%, rgba(3,1,2,0.52) 48%, rgba(3,1,2,0.84) 100%)",
+        }}
+      >
+        <TopNav />
 
-      <section style={{ ...sectionWrap, paddingTop: isMobile ? "10px" : "26px" }}>
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "1.02fr 0.98fr",
-            gap: "24px",
-            alignItems: "center",
-            minHeight: isMobile ? "auto" : "64vh",
-          }}
+        <section
+          style={{ ...sectionWrap, paddingTop: isMobile ? "10px" : "26px" }}
         >
           <div
             style={{
-              display: "flex",
-              flexDirection: "column",
-              justifyContent: "center",
-              gap: "20px",
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "1.02fr 0.98fr",
+              gap: "24px",
+              alignItems: "center",
+              minHeight: isMobile ? "auto" : "64vh",
             }}
           >
-            <RedLabel>Solución inteligente para negocios</RedLabel>
-
-            <h1
+            <div
               style={{
-                margin: 0,
-                fontSize: "clamp(42px, 7vw, 88px)",
-                lineHeight: 0.95,
-                letterSpacing: "-0.06em",
-                fontWeight: 900,
-                maxWidth: "800px",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "center",
+                gap: "20px",
               }}
             >
-              Automatiza tu atención y convierte más conversaciones en ventas.
-            </h1>
+              <RedLabel>Solución inteligente para negocios</RedLabel>
+
+              <h1
+                style={{
+                  margin: 0,
+                  fontSize: "clamp(42px, 7vw, 88px)",
+                  lineHeight: 0.95,
+                  letterSpacing: "-0.06em",
+                  fontWeight: 900,
+                  maxWidth: "800px",
+                }}
+              >
+                Atiende por voz y chat como si tu negocio nunca cerrara.
+              </h1>
+
+              <p
+                style={{
+                  ...mutedText,
+                  fontSize: "clamp(16px, 2vw, 21px)",
+                  maxWidth: "760px",
+                }}
+              >
+                NYT Assistant convierte tu página web en una experiencia
+                conversacional profesional: responde dudas, atiende por voz,
+                captura prospectos y guía cada conversación hacia una venta, una
+                cita o un seguimiento útil.
+              </p>
+
+              <div
+                style={{
+                  display: "flex",
+                  gap: "14px",
+                  flexWrap: "wrap",
+                  flexDirection: isMobile ? "column" : "row",
+                }}
+              >
+                <a
+                  href="#demo"
+                  style={{
+                    textDecoration: "none",
+                    background: "linear-gradient(135deg, #ff1744, #780014)",
+                    color: "#fff",
+                    padding: "15px 20px",
+                    borderRadius: "16px",
+                    fontWeight: 900,
+                    boxShadow: "0 18px 50px rgba(255, 42, 42, 0.28)",
+                    textAlign: "center",
+                  }}
+                >
+                  Probar llamada
+                </a>
+
+                <a
+                  href="#benefits"
+                  style={{
+                    textDecoration: "none",
+                    background: "rgba(255,255,255,0.04)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    color: "#fff",
+                    padding: "15px 20px",
+                    borderRadius: "16px",
+                    fontWeight: 800,
+                    textAlign: "center",
+                  }}
+                >
+                  Ver cómo funciona
+                </a>
+              </div>
+
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, auto)",
+                  gap: "10px",
+                  marginTop: "4px",
+                }}
+              >
+                {["Voz natural", "Interrumpible", "Leads", "24/7"].map(
+                  (item) => (
+                    <div
+                      key={item}
+                      style={{
+                        padding: "10px 13px",
+                        borderRadius: "999px",
+                        border: "1px solid rgba(255, 55, 86, 0.28)",
+                        background: "rgba(255, 18, 58, 0.1)",
+                        color: "rgba(255,255,255,0.86)",
+                        fontSize: "13px",
+                        fontWeight: 800,
+                        textAlign: "center",
+                        boxShadow: "0 0 24px rgba(255, 24, 58, 0.12)",
+                      }}
+                    >
+                      {item}
+                    </div>
+                  ),
+                )}
+              </div>
+            </div>
+
+            <div
+              style={{
+                ...panelStyle,
+                padding: isMobile ? "18px" : "24px",
+                background:
+                  "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 28%), rgba(255,255,255,0.04)",
+              }}
+            >
+              <div
+                style={{
+                  display: "grid",
+                  gap: "12px",
+                }}
+              >
+                <div
+                  style={{
+                    maxWidth: "82%",
+                    background: "rgba(255,255,255,0.06)",
+                    border: "1px solid rgba(255,255,255,0.06)",
+                    color: "rgba(255,255,255,0.82)",
+                    padding: "12px 14px",
+                    borderRadius: "16px 16px 16px 4px",
+                    lineHeight: 1.6,
+                    fontSize: "14px",
+                  }}
+                >
+                  Hola, quiero una solución para atender clientes sin depender
+                  de horarios ni respuestas manuales.
+                </div>
+
+                <div
+                  style={{
+                    marginLeft: "auto",
+                    maxWidth: "86%",
+                    background: "linear-gradient(135deg, #ff1744, #780014)",
+                    color: "#fff",
+                    padding: "12px 14px",
+                    borderRadius: "16px 16px 4px 16px",
+                    lineHeight: 1.6,
+                    fontSize: "14px",
+                    fontWeight: 700,
+                    boxShadow: "0 18px 40px rgba(255, 42, 42, 0.22)",
+                  }}
+                >
+                  Perfecto. NYT Assistant automatiza respuestas, identifica
+                  oportunidades reales y mantiene una atención constante para
+                  que tu negocio no pierda clientes.
+                </div>
+
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+                    gap: "12px",
+                    marginTop: "8px",
+                  }}
+                >
+                  {[
+                    ["Disponibilidad", "24/7"],
+                    ["Aplicación", "Ventas y atención"],
+                    ["Impacto", "Más prospectos útiles"],
+                  ].map(([label, value]) => (
+                    <div
+                      key={label}
+                      style={{
+                        background: "rgba(0,0,0,0.34)",
+                        border: "1px solid rgba(255,255,255,0.08)",
+                        borderRadius: "18px",
+                        padding: "14px",
+                      }}
+                    >
+                      <div
+                        style={{
+                          color: "rgba(255,255,255,0.5)",
+                          fontSize: "11px",
+                          textTransform: "uppercase",
+                          letterSpacing: "0.08em",
+                          marginBottom: "8px",
+                          fontWeight: 800,
+                        }}
+                      >
+                        {label}
+                      </div>
+                      <div
+                        style={{
+                          color: "#fff",
+                          fontWeight: 900,
+                          fontSize: "18px",
+                        }}
+                      >
+                        {value}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="benefits" style={{ ...sectionWrap, paddingTop: "70px" }}>
+          <div style={{ marginBottom: "20px" }}>
+            <RedLabel>Beneficios</RedLabel>
+            <h2
+              style={{
+                fontSize: "clamp(30px, 4vw, 54px)",
+                lineHeight: 0.98,
+                letterSpacing: "-0.05em",
+                margin: "16px 0 10px",
+                fontWeight: 900,
+                maxWidth: "760px",
+              }}
+            >
+              Lo que realmente aporta a tu negocio
+            </h2>
+            <p style={{ ...mutedText, maxWidth: "760px" }}>
+              Una solución diseñada para responder mejor, atender más rápido y
+              dar seguimiento a cada oportunidad sin saturar tu operación
+              diaria.
+            </p>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
+              gap: "18px",
+            }}
+          >
+            <BenefitCard
+              title="Atención inmediata"
+              text="Responde mensajes en segundos para que tus clientes reciban información clara, útil y oportuna desde el primer contacto."
+            />
+            <BenefitCard
+              title="Mejor calificación de prospectos"
+              text="Detecta intención de compra, organiza conversaciones y ayuda a identificar qué contactos tienen mayor probabilidad de convertirse en venta."
+            />
+            <BenefitCard
+              title="Operación más eficiente"
+              text="Reduce carga operativa en atención, mantiene conversaciones activas y permite escalar sin depender de más personal para responder lo mismo."
+            />
+          </div>
+        </section>
+
+        <section
+          id="demo"
+          style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "8px" }}
+        >
+          <div style={{ marginBottom: "20px" }}>
+            <RedLabel>Demo principal</RedLabel>
+            <h2
+              style={{
+                fontSize: "clamp(30px, 4vw, 54px)",
+                lineHeight: 0.98,
+                letterSpacing: "-0.05em",
+                margin: "16px 0 10px",
+                fontWeight: 900,
+                maxWidth: "760px",
+              }}
+            >
+              Pruébalo directamente desde esta página
+            </h2>
+            <p style={{ ...mutedText, maxWidth: "760px" }}>
+              Aquí puedes ver cómo responde, cómo guía la conversación y cómo se
+              adapta a distintos tipos de atención sin salir del sitio.
+            </p>
+          </div>
+
+          <EmbeddedDemo />
+        </section>
+
+        <section id="flow" style={{ ...sectionWrap, paddingTop: "84px" }}>
+          <div style={{ marginBottom: "20px" }}>
+            <RedLabel>Cómo funciona</RedLabel>
+            <h2
+              style={{
+                fontSize: "clamp(30px, 4vw, 54px)",
+                lineHeight: 0.98,
+                letterSpacing: "-0.05em",
+                margin: "16px 0 10px",
+                fontWeight: 900,
+                maxWidth: "760px",
+              }}
+            >
+              Un proceso claro, rápido y fácil de implementar
+            </h2>
+          </div>
+
+          <div
+            style={{
+              display: "grid",
+              gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
+              gap: "18px",
+            }}
+          >
+            <StepCard
+              step="1"
+              title="El cliente inicia la conversación"
+              text="Escribe o habla desde la web para hacer una consulta, pedir información o iniciar un proceso de compra."
+            />
+            <StepCard
+              step="2"
+              title="El asistente interpreta la necesidad"
+              text="Analiza el mensaje para entender si se trata de ventas, soporte, seguimiento o una solicitud específica."
+            />
+            <StepCard
+              step="3"
+              title="Responde y orienta"
+              text="Entrega una respuesta útil, mantiene el contexto y lleva la conversación hacia el siguiente paso correcto."
+            />
+            <StepCard
+              step="4"
+              title="Tu negocio recibe oportunidades mejor organizadas"
+              text="Cuando detecta interés real, la información queda lista para seguimiento y una atención comercial más efectiva."
+            />
+          </div>
+        </section>
+
+        <section
+          style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "100px" }}
+        >
+          <div
+            style={{
+              ...panelStyle,
+              padding: isMobile ? "22px" : "30px",
+              background:
+                "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 22%), rgba(255,255,255,0.04)",
+              textAlign: isMobile ? "left" : "center",
+            }}
+          >
+            <RedLabel>Empieza hoy</RedLabel>
+            <h2
+              style={{
+                fontSize: "clamp(30px, 4vw, 52px)",
+                lineHeight: 0.98,
+                letterSpacing: "-0.05em",
+                margin: "16px 0 12px",
+                fontWeight: 900,
+              }}
+            >
+              Presenta la IA como un producto real, claro y vendible.
+            </h2>
 
             <p
               style={{
                 ...mutedText,
-                fontSize: "clamp(16px, 2vw, 21px)",
                 maxWidth: "760px",
+                margin: isMobile ? 0 : "0 auto",
               }}
             >
-              NYT Assistant ayuda a tu negocio a responder más rápido, atender
-              mejor y aprovechar cada oportunidad desde el primer mensaje.
-              Automatiza consultas, filtra prospectos y mantiene una experiencia
-              profesional en cada conversación.
+              La demo ahora está pensada para que cualquier cliente entienda
+              rápido qué hace, cómo atiende y por qué puede ayudarle a vender o
+              responder mejor.
             </p>
 
             <div
               style={{
+                marginTop: "22px",
                 display: "flex",
-                gap: "14px",
-                flexWrap: "wrap",
+                justifyContent: isMobile ? "stretch" : "center",
+                gap: "12px",
                 flexDirection: isMobile ? "column" : "row",
               }}
             >
@@ -515,333 +855,37 @@ function HomePage() {
                   textDecoration: "none",
                   background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
                   color: "#fff",
-                  padding: "15px 20px",
+                  padding: "16px 22px",
                   borderRadius: "16px",
                   fontWeight: 900,
                   boxShadow: "0 18px 50px rgba(255, 42, 42, 0.28)",
+                  minWidth: isMobile ? "100%" : "auto",
                   textAlign: "center",
                 }}
               >
-                Probar demo
+                Probar la demo
               </a>
 
               <a
-                href="#benefits"
+                href="/assistants"
                 style={{
                   textDecoration: "none",
                   background: "rgba(255,255,255,0.04)",
                   border: "1px solid rgba(255,255,255,0.08)",
                   color: "#fff",
-                  padding: "15px 20px",
+                  padding: "16px 22px",
                   borderRadius: "16px",
                   fontWeight: 800,
+                  minWidth: isMobile ? "100%" : "auto",
                   textAlign: "center",
                 }}
               >
-                Conocer más
+                Abrir modo pantalla completa
               </a>
             </div>
           </div>
-
-          <div
-            style={{
-              ...panelStyle,
-              padding: isMobile ? "18px" : "24px",
-              background:
-                "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 28%), rgba(255,255,255,0.04)",
-            }}
-          >
-            <div
-              style={{
-                display: "grid",
-                gap: "12px",
-              }}
-            >
-              <div
-                style={{
-                  maxWidth: "82%",
-                  background: "rgba(255,255,255,0.06)",
-                  border: "1px solid rgba(255,255,255,0.06)",
-                  color: "rgba(255,255,255,0.82)",
-                  padding: "12px 14px",
-                  borderRadius: "16px 16px 16px 4px",
-                  lineHeight: 1.6,
-                  fontSize: "14px",
-                }}
-              >
-                Hola, quiero una solución para atender clientes sin depender de
-                horarios ni respuestas manuales.
-              </div>
-
-              <div
-                style={{
-                  marginLeft: "auto",
-                  maxWidth: "86%",
-                  background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
-                  color: "#fff",
-                  padding: "12px 14px",
-                  borderRadius: "16px 16px 4px 16px",
-                  lineHeight: 1.6,
-                  fontSize: "14px",
-                  fontWeight: 700,
-                  boxShadow: "0 18px 40px rgba(255, 42, 42, 0.22)",
-                }}
-              >
-                Perfecto. NYT Assistant automatiza respuestas, identifica
-                oportunidades reales y mantiene una atención constante para que
-                tu negocio no pierda clientes.
-              </div>
-
-              <div
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-                  gap: "12px",
-                  marginTop: "8px",
-                }}
-              >
-                {[
-                  ["Disponibilidad", "24/7"],
-                  ["Aplicación", "Ventas y atención"],
-                  ["Impacto", "Más prospectos útiles"],
-                ].map(([label, value]) => (
-                  <div
-                    key={label}
-                    style={{
-                      background: "rgba(0,0,0,0.34)",
-                      border: "1px solid rgba(255,255,255,0.08)",
-                      borderRadius: "18px",
-                      padding: "14px",
-                    }}
-                  >
-                    <div
-                      style={{
-                        color: "rgba(255,255,255,0.5)",
-                        fontSize: "11px",
-                        textTransform: "uppercase",
-                        letterSpacing: "0.08em",
-                        marginBottom: "8px",
-                        fontWeight: 800,
-                      }}
-                    >
-                      {label}
-                    </div>
-                    <div
-                      style={{
-                        color: "#fff",
-                        fontWeight: 900,
-                        fontSize: "18px",
-                      }}
-                    >
-                      {value}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="benefits" style={{ ...sectionWrap, paddingTop: "70px" }}>
-        <div style={{ marginBottom: "20px" }}>
-          <RedLabel>Beneficios</RedLabel>
-          <h2
-            style={{
-              fontSize: "clamp(30px, 4vw, 54px)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              margin: "16px 0 10px",
-              fontWeight: 900,
-              maxWidth: "760px",
-            }}
-          >
-            Lo que realmente aporta a tu negocio
-          </h2>
-          <p style={{ ...mutedText, maxWidth: "760px" }}>
-            Una solución diseñada para responder mejor, atender más rápido y dar
-            seguimiento a cada oportunidad sin saturar tu operación diaria.
-          </p>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)",
-            gap: "18px",
-          }}
-        >
-          <BenefitCard
-            title="Atención inmediata"
-            text="Responde mensajes en segundos para que tus clientes reciban información clara, útil y oportuna desde el primer contacto."
-          />
-          <BenefitCard
-            title="Mejor calificación de prospectos"
-            text="Detecta intención de compra, organiza conversaciones y ayuda a identificar qué contactos tienen mayor probabilidad de convertirse en venta."
-          />
-          <BenefitCard
-            title="Operación más eficiente"
-            text="Reduce carga operativa en atención, mantiene conversaciones activas y permite escalar sin depender de más personal para responder lo mismo."
-          />
-        </div>
-      </section>
-
-      <section
-        id="demo"
-        style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "8px" }}
-      >
-        <div style={{ marginBottom: "20px" }}>
-          <RedLabel>Demo principal</RedLabel>
-          <h2
-            style={{
-              fontSize: "clamp(30px, 4vw, 54px)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              margin: "16px 0 10px",
-              fontWeight: 900,
-              maxWidth: "760px",
-            }}
-          >
-            Pruébalo directamente desde esta página
-          </h2>
-          <p style={{ ...mutedText, maxWidth: "760px" }}>
-            Aquí puedes ver cómo responde, cómo guía la conversación y cómo se
-            adapta a distintos tipos de atención sin salir del sitio.
-          </p>
-        </div>
-
-        <EmbeddedDemo />
-      </section>
-
-      <section id="flow" style={{ ...sectionWrap, paddingTop: "84px" }}>
-        <div style={{ marginBottom: "20px" }}>
-          <RedLabel>Cómo funciona</RedLabel>
-          <h2
-            style={{
-              fontSize: "clamp(30px, 4vw, 54px)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              margin: "16px 0 10px",
-              fontWeight: 900,
-              maxWidth: "760px",
-            }}
-          >
-            Un proceso claro, rápido y fácil de implementar
-          </h2>
-        </div>
-
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: isMobile ? "1fr" : "repeat(4, 1fr)",
-            gap: "18px",
-          }}
-        >
-          <StepCard
-            step="1"
-            title="El cliente inicia la conversación"
-            text="Escribe o habla desde la web para hacer una consulta, pedir información o iniciar un proceso de compra."
-          />
-          <StepCard
-            step="2"
-            title="El asistente interpreta la necesidad"
-            text="Analiza el mensaje para entender si se trata de ventas, soporte, seguimiento o una solicitud específica."
-          />
-          <StepCard
-            step="3"
-            title="Responde y orienta"
-            text="Entrega una respuesta útil, mantiene el contexto y lleva la conversación hacia el siguiente paso correcto."
-          />
-          <StepCard
-            step="4"
-            title="Tu negocio recibe oportunidades mejor organizadas"
-            text="Cuando detecta interés real, la información queda lista para seguimiento y una atención comercial más efectiva."
-          />
-        </div>
-      </section>
-
-      <section
-        style={{ ...sectionWrap, paddingTop: "84px", paddingBottom: "100px" }}
-      >
-        <div
-          style={{
-            ...panelStyle,
-            padding: isMobile ? "22px" : "30px",
-            background:
-              "radial-gradient(circle at top right, rgba(255,42,42,0.18), transparent 22%), rgba(255,255,255,0.04)",
-            textAlign: isMobile ? "left" : "center",
-          }}
-        >
-          <RedLabel>Empieza hoy</RedLabel>
-          <h2
-            style={{
-              fontSize: "clamp(30px, 4vw, 52px)",
-              lineHeight: 0.98,
-              letterSpacing: "-0.05em",
-              margin: "16px 0 12px",
-              fontWeight: 900,
-            }}
-          >
-            Muestra una experiencia real desde el primer momento.
-          </h2>
-
-          <p
-            style={{
-              ...mutedText,
-              maxWidth: "760px",
-              margin: isMobile ? 0 : "0 auto",
-            }}
-          >
-            La mejor forma de presentar una solución como esta es dejar que el
-            cliente la vea funcionando, la pruebe y entienda su valor en pocos
-            segundos.
-          </p>
-
-          <div
-            style={{
-              marginTop: "22px",
-              display: "flex",
-              justifyContent: isMobile ? "stretch" : "center",
-              gap: "12px",
-              flexDirection: isMobile ? "column" : "row",
-            }}
-          >
-            <a
-              href="#demo"
-              style={{
-                textDecoration: "none",
-                background: "linear-gradient(135deg, #ff2a2a, #7a0000)",
-                color: "#fff",
-                padding: "16px 22px",
-                borderRadius: "16px",
-                fontWeight: 900,
-                boxShadow: "0 18px 50px rgba(255, 42, 42, 0.28)",
-                minWidth: isMobile ? "100%" : "auto",
-                textAlign: "center",
-              }}
-            >
-              Probar la demo
-            </a>
-
-            <a
-              href="/assistants"
-              style={{
-                textDecoration: "none",
-                background: "rgba(255,255,255,0.04)",
-                border: "1px solid rgba(255,255,255,0.08)",
-                color: "#fff",
-                padding: "16px 22px",
-                borderRadius: "16px",
-                fontWeight: 800,
-                minWidth: isMobile ? "100%" : "auto",
-                textAlign: "center",
-              }}
-            >
-              Ver experiencia completa
-            </a>
-          </div>
-        </div>
-      </section>
+        </section>
+      </div>
 
       <AssistantWidget
         title="NYT Assistant"

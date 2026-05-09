@@ -102,12 +102,12 @@ function buildSpokenVersion(fullReply = "") {
 
   const words = clean.split(" ");
 
-  if (words.length <= 40) {
+  if (words.length <= 28) {
     return clean;
   }
 
-  const shortPreview = words.slice(0, 28).join(" ");
-  return `${shortPreview}. Te dejé el resto en pantalla para que lo leas con calma.`;
+  const shortPreview = words.slice(0, 24).join(" ");
+  return `${shortPreview}. ¿Quieres que lo revisemos por partes?`;
 }
 
 function extractPhone(text) {
@@ -375,8 +375,8 @@ function shouldSpeakReply(reply = "", channel = "chat", transitionText = "") {
     "whatsapp",
   ].some((p) => text.includes(p));
 
-  if (words <= 34) return true;
-  if (words <= 55 && hasPriorityIntent) return true;
+  if (words <= 30) return true;
+  if (words <= 42 && hasPriorityIntent) return true;
 
   return false;
 }
@@ -662,7 +662,8 @@ Reglas globales:
 - responde como parte real del equipo
 - sé clara, humana y profesional
 - evita respuestas genéricas
-- en voz responde más breve
+- habla como en llamada real: directo, natural y sin relleno
+- en voz responde máximo 28 palabras
 - si la respuesta es larga, resume y deja el resto para lectura
 - mantente enfocada en el servicio principal del negocio
 - evita hablar de temas ajenos al objetivo comercial o de atención
@@ -695,16 +696,19 @@ ${
 INSTRUCCIONES OPERATIVAS:
 - mantén coherencia con la personalidad de ${assistant.name}
 - responde como integrante real del equipo
+- habla como llamada real: directo, natural y sin relleno
+- si el canal es voice, responde máximo 28 palabras
+- usa 1 a 3 frases cortas
+- haz solo una pregunta al final cuando ayude a avanzar
 - si el usuario necesita otra especialidad, puedes redirigir internamente
 - no expliques el sistema interno
-- si detectas intención de venta clara, avanza
-- si detectas una duda o problema técnico, orienta o deja lista la transición
+- si detectas intención de venta clara, avanza hacia nombre, WhatsApp o demo
+- si detectas una duda técnica, orienta con pasos simples
 - no te salgas del tema principal del asistente actual
 - no desarrolles conversaciones largas sobre temas generales, curiosidades o asuntos ajenos al servicio
 - si el usuario se desvía del enfoque, recuérdale tu función y redirígelo con naturalidad
-- si el usuario insiste en temas ajenos, responde breve y vuelve al propósito principal
+- evita frases genéricas como "estoy aquí para ayudarte"
 - prioriza siempre el servicio principal, la orientación útil y el siguiente paso correcto
-- evita respuestas innecesariamente largas
 `;
 }
 
@@ -831,7 +835,7 @@ async function openRouterChatCompletion({
       model,
       messages,
       temperature,
-      max_tokens: 120,
+      max_tokens: 85,
     },
     {
       headers: {
@@ -882,7 +886,7 @@ async function openAIResponsesText({
     {
       model,
       input,
-      max_output_tokens: 120,
+      max_output_tokens: 85,
     },
     {
       headers: {
@@ -936,7 +940,7 @@ async function synthesizeWithElevenLabs(text, assistantId = "isis") {
     throw new Error("Falta configurar ElevenLabs");
   }
 
-  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}`;
+  const url = `https://api.elevenlabs.io/v1/text-to-speech/${voiceId}?optimize_streaming_latency=3&output_format=mp3_22050_32`;
 
   const response = await axios.post(
     url,
@@ -944,11 +948,11 @@ async function synthesizeWithElevenLabs(text, assistantId = "isis") {
       text,
       model_id: process.env.ELEVENLABS_MODEL_ID || "eleven_flash_v2_5",
       voice_settings: {
-        stability: 0.45,
-        similarity_boost: 0.8,
-        style: 0.15,
+        stability: 0.38,
+        similarity_boost: 0.82,
+        style: 0.12,
         use_speaker_boost: true,
-        speed: 1.0,
+        speed: 1.08,
       },
     },
     {
@@ -982,10 +986,11 @@ async function generateAIReply({
 Canal actual: ${channel}
 
 Instrucciones del canal:
-- en voice responde breve
+- en voice responde como llamada real, máximo 28 palabras
+- evita introducciones largas y despedidas innecesarias
 - si falta contexto, pide solo lo importante
-- no llenes de texto innecesario
 - si el mensaje es claro, avanza sin rodeos
+- cuando haya interés comercial, busca el siguiente paso: nombre, WhatsApp o demo
 `;
 
   const history = getConversationHistory(conversationId).filter(
@@ -1000,7 +1005,7 @@ Instrucciones del canal:
   const clientType = detectClientType(req);
   const origin = getOriginForProvider(req);
 
-  const openAIModel = process.env.OPENAI_MODEL || "gpt-5.4-mini";
+  const openAIModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const openRouterModel =
     process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 
@@ -1105,7 +1110,7 @@ async function generateLeadSummary({ messages }) {
     const userPrompt = `Resume este lead en 1 línea. Incluye qué quiere el cliente y si pidió demo.\n\nConversación:\n${text}`;
 
     const summary = await openAIResponsesText({
-      model: process.env.OPENAI_MODEL || "gpt-5.4-mini",
+      model: process.env.OPENAI_MODEL || "gpt-4o-mini",
       systemPrompt,
       history: [],
       userMessage: userPrompt,

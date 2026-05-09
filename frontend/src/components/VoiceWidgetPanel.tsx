@@ -9,11 +9,6 @@ type Props = {
   assistantColor?: string;
 };
 
-declare global {
-  interface PermissionDescriptor {
-    name: PermissionName | "microphone";
-  }
-}
 
 const pulseKeyframes = `
 @keyframes hmVoicePulse {
@@ -32,6 +27,12 @@ const pulseKeyframes = `
   0% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0); }
   50% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 36px rgba(255,255,255,0.12); }
   100% { box-shadow: 0 0 0 rgba(0,0,0,0), 0 0 0 rgba(0,0,0,0); }
+}
+
+@keyframes hmLiveRing {
+  0% { transform: scale(0.92); opacity: 0.65; }
+  70% { transform: scale(1.22); opacity: 0; }
+  100% { transform: scale(1.22); opacity: 0; }
 }
 `;
 
@@ -76,11 +77,11 @@ function StatusText({ state }: { state: VoiceState }) {
       case "recording":
         return "Grabando...";
       case "thinking":
-        return "Procesando...";
+        return "Pensando la respuesta...";
       case "speaking":
-        return "Hablando...";
+        return "Respondiendo...";
       default:
-        return "Lista para hablar";
+        return "Lista para iniciar";
     }
   }, [state]);
 
@@ -120,7 +121,7 @@ export default function VoiceWidgetPanel({
   const [seconds, setSeconds] = useState(0);
   const [transcript, setTranscript] = useState("");
   const [lastResponse, setLastResponse] = useState(
-    `Hola, soy ${assistantName}.`
+    `Hola, soy ${assistantName}. Puedo atender por voz y ayudarte a captar un prospecto.`
   );
   const [unsupported, setUnsupported] = useState(false);
 
@@ -228,7 +229,7 @@ export default function VoiceWidgetPanel({
 
         const status = await navigator.permissions.query({
           name: "microphone",
-        } as PermissionDescriptor);
+        } as unknown as PermissionDescriptor);
 
         if (!mounted) return;
 
@@ -379,7 +380,7 @@ export default function VoiceWidgetPanel({
     };
   }, []);
 
-  function scheduleRelisten(delay = 1800) {
+  function scheduleRelisten(delay = 550) {
     clearRelistenTimer();
 
     relistenTimerRef.current = window.setTimeout(() => {
@@ -389,6 +390,7 @@ export default function VoiceWidgetPanel({
       if (speakingRef.current) return;
       if (busyRef.current) return;
 
+      setVoiceState("listening");
       void startAudioRecording();
     }, delay);
   }
@@ -591,7 +593,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 2400 : 2200);
+        scheduleRelisten(isMobileDevice() ? 700 : 550);
       } else {
         setVoiceState("idle");
       }
@@ -617,7 +619,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 2600 : 2400);
+        scheduleRelisten(isMobileDevice() ? 850 : 700);
       }
     }
   }
@@ -677,7 +679,7 @@ export default function VoiceWidgetPanel({
           autoContinueRef.current &&
           !stoppedRef.current
         ) {
-          scheduleRelisten(isMobileDevice() ? 1800 : 1600);
+          scheduleRelisten(isMobileDevice() ? 650 : 500);
         }
         return;
       }
@@ -698,7 +700,7 @@ export default function VoiceWidgetPanel({
         autoContinueRef.current &&
         !stoppedRef.current
       ) {
-        scheduleRelisten(isMobileDevice() ? 2400 : 2200);
+        scheduleRelisten(isMobileDevice() ? 700 : 550);
       }
     }
   }
@@ -753,7 +755,7 @@ export default function VoiceWidgetPanel({
       let audioContext: AudioContext | null = null;
       let source: MediaStreamAudioSourceNode | null = null;
       let analyser: AnalyserNode | null = null;
-      let dataArray: Uint8Array<ArrayBuffer> | null = null;
+      let dataArray: Uint8Array | null = null;
 
       if (AudioContextCtor) {
         audioContext = new AudioContextCtor();
@@ -761,7 +763,7 @@ export default function VoiceWidgetPanel({
         analyser = audioContext.createAnalyser();
         analyser.fftSize = 2048;
         source.connect(analyser);
-        dataArray = new Uint8Array(new ArrayBuffer(analyser.fftSize));
+        dataArray = new Uint8Array(analyser.fftSize);
 
         analyserContextRef.current = audioContext;
         analyserSourceRef.current = source;
@@ -771,10 +773,10 @@ export default function VoiceWidgetPanel({
       let startedAt = 0;
       let silenceStartedAt: number | null = null;
 
-      const MIN_RECORD_MS = 1400;
-      const MAX_RECORD_MS = isMobileLayout ? 15000 : 12000;
-      const END_SILENCE_MS = isMobileLayout ? 1100 : 950;
-      const SILENCE_THRESHOLD = isMobileLayout ? 6 : 7;
+      const MIN_RECORD_MS = isMobileLayout ? 900 : 750;
+      const MAX_RECORD_MS = isMobileLayout ? 12000 : 9500;
+      const END_SILENCE_MS = isMobileLayout ? 720 : 620;
+      const SILENCE_THRESHOLD = isMobileLayout ? 5.2 : 5.8;
 
       function stopAndCleanup() {
         clearSilenceMonitor();
@@ -803,7 +805,7 @@ export default function VoiceWidgetPanel({
         }
 
         if (analyser && dataArray) {
-          analyser.getByteTimeDomainData(dataArray);
+          analyser.getByteTimeDomainData(dataArray as any);
 
           let sum = 0;
           for (let i = 0; i < dataArray.length; i += 1) {
@@ -856,7 +858,7 @@ export default function VoiceWidgetPanel({
 
         if (!chunks.length) {
           setVoiceState("idle");
-          scheduleRelisten(1800);
+          scheduleRelisten(650);
           return;
         }
 
@@ -873,10 +875,10 @@ export default function VoiceWidgetPanel({
         stopStream();
         setVoiceState("idle");
         setLastResponse("El navegador falló al grabar el audio.");
-        scheduleRelisten(2400);
+        scheduleRelisten(850);
       };
 
-      recorder.start();
+      recorder.start(250);
     } catch (error: any) {
       console.error("Error al acceder al micrófono:", error);
 
@@ -894,6 +896,28 @@ export default function VoiceWidgetPanel({
       setVoiceState("idle");
       setShowPermissionScreen(true);
     }
+  }
+
+  async function talkNow() {
+    if (!callActiveRef.current) {
+      startCall();
+      return;
+    }
+
+    clearRelistenTimer();
+    cleanupSpeech();
+    stopRecorder();
+    stopStream();
+    setIsBusy(false);
+    busyRef.current = false;
+    speakingRef.current = false;
+    setTransitionText("");
+    setVoiceState("listening");
+    window.setTimeout(() => {
+      if (!stoppedRef.current && callActiveRef.current) {
+        void startAudioRecording();
+      }
+    }, 120);
   }
 
   async function activateMicrophone() {
@@ -923,7 +947,7 @@ export default function VoiceWidgetPanel({
     setSeconds(0);
     setTranscript("");
     setTransitionText("");
-    setLastResponse(`La llamada con ${activeAssistantName} ha comenzado.`);
+    setLastResponse(`${activeAssistantName} está escuchando. Habla como en una llamada normal.`);
     setShowPermissionScreen(false);
 
     void startAudioRecording();
@@ -932,7 +956,7 @@ export default function VoiceWidgetPanel({
   const permissionHelp =
     micPermission === "denied"
       ? "Tu navegador bloqueó el micrófono. Actívalo en la configuración del sitio y vuelve a abrir esta ventana."
-      : `Para comenzar, permite el uso del micrófono. Después podrás hablar con ${activeAssistantName} y, si dejas la conversación continua encendida, seguirá escuchando automáticamente.`;
+      : `Permite el micrófono para iniciar una llamada real con ${activeAssistantName}. Podrás hablar, interrumpir y continuar sin repetir pasos.`;
 
   const orbColor =
     voiceState === "listening" || voiceState === "recording"
@@ -1047,7 +1071,7 @@ export default function VoiceWidgetPanel({
                 marginBottom: "12px",
               }}
             >
-              {isSwitchingAssistant ? "Cambiando asistente" : "Asistente activa"}
+              {isSwitchingAssistant ? "Cambiando asistente" : "Llamada activa"}
             </div>
 
             <div
@@ -1199,8 +1223,7 @@ export default function VoiceWidgetPanel({
                   fontSize: "14px",
                 }}
               >
-                <strong>Consejo:</strong> habla normal y con el micrófono cerca.
-                Ya no hace falta usar otro sistema distinto en compu y celular.
+                <strong>Modo llamada:</strong> habla normal. Si la IA está respondiendo y quieres cortar, usa <strong>Hablar ahora</strong>.
               </div>
 
               <button
@@ -1287,7 +1310,7 @@ export default function VoiceWidgetPanel({
                         wordBreak: "break-word",
                       }}
                     >
-                      {transcript || "Aún no hay voz detectada."}
+                      {transcript || "Habla cuando el indicador esté en verde."}
                     </div>
                   </div>
 
@@ -1310,7 +1333,7 @@ export default function VoiceWidgetPanel({
                         letterSpacing: "0.08em",
                       }}
                     >
-                      Respuesta
+                      Respuesta de la IA
                     </div>
 
                     <div
@@ -1352,7 +1375,7 @@ export default function VoiceWidgetPanel({
                         checked={autoContinue}
                         onChange={(e) => setAutoContinue(e.target.checked)}
                       />
-                      Conversación continua
+                      Escucha automática
                     </label>
 
                     {!callActive ? (
@@ -1375,22 +1398,46 @@ export default function VoiceWidgetPanel({
                         Iniciar llamada
                       </button>
                     ) : (
-                      <button
-                        onClick={endCall}
+                      <div
                         style={{
-                          width: buttonWidth,
-                          border: "none",
-                          borderRadius: "999px",
-                          padding: "14px 22px",
-                          background: "#ef4444",
-                          color: "#ffffff",
-                          fontWeight: 800,
-                          cursor: "pointer",
-                          boxShadow: "0 14px 28px rgba(239, 68, 68, 0.22)",
+                          display: "grid",
+                          gridTemplateColumns: isMobileLayout ? "1fr" : "1fr 1fr",
+                          gap: "10px",
                         }}
                       >
-                        Colgar
-                      </button>
+                        <button
+                          onClick={talkNow}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            borderRadius: "999px",
+                            padding: "14px 18px",
+                            background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                            color: "#ffffff",
+                            fontWeight: 900,
+                            cursor: "pointer",
+                            boxShadow: "0 14px 28px rgba(34, 197, 94, 0.24)",
+                          }}
+                        >
+                          Hablar ahora
+                        </button>
+                        <button
+                          onClick={endCall}
+                          style={{
+                            width: "100%",
+                            border: "none",
+                            borderRadius: "999px",
+                            padding: "14px 18px",
+                            background: "#ef4444",
+                            color: "#ffffff",
+                            fontWeight: 900,
+                            cursor: "pointer",
+                            boxShadow: "0 14px 28px rgba(239, 68, 68, 0.22)",
+                          }}
+                        >
+                          Finalizar
+                        </button>
+                      </div>
                     )}
                   </div>
                 </>
