@@ -17,6 +17,11 @@ function normalizeClientConfig(raw = {}) {
     assistantName: raw.assistantName || "NYT Assistant",
     tone: raw.tone || "profesional, claro y amable",
     services: Array.isArray(raw.services) ? raw.services : [],
+    businessHours: raw.businessHours || "",
+    location: raw.location || "",
+    appointmentTypes: Array.isArray(raw.appointmentTypes)
+      ? raw.appointmentTypes
+      : [],
     faq: Array.isArray(raw.faq) ? raw.faq : [],
     rules: Array.isArray(raw.rules) ? raw.rules : [],
     leadFields: Array.isArray(raw.leadFields) ? raw.leadFields : [],

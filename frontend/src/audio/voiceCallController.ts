@@ -9,6 +9,7 @@ export type VoiceCallState =
   | "listening"
   | "ending_user_turn"
   | "correcting_transcript"
+  | "transcript_ready"
   | "sending_to_ai"
   | "speaking"
   | "interrupted"
@@ -187,6 +188,11 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
   }
 
   function createTurn() {
+    const autoSend = options.getConfig().autoSend;
+    debug("create turn", {
+      autoSendAfterSilence: autoSend,
+    });
+
     currentTurn = {
       id: makeTurnId(),
       startedAt: now(),
@@ -275,7 +281,11 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
     );
 
     const rawText = currentTurn.combinedTranscript;
-    debug("finish turn", reason, rawText);
+    debug("finish turn", {
+      reason,
+      rawText,
+      autoSendAfterSilence: options.getConfig().autoSend,
+    });
 
     transition("ending_user_turn");
     pauseRecognition();
@@ -308,17 +318,31 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
     }
 
     finalText = cleanCombinedTranscript(finalText, "");
+    debug("final transcript", {
+      finalTranscript: finalText,
+      confidence: correction?.confidence || "uncorrected",
+      source: "conversation",
+    });
     options.onFinalTranscript(finalText, correction);
 
     if (!options.getConfig().autoSend) {
-      debug("auto-send disabled; transcript ready for manual review");
-      transition("waiting_for_speech");
+      debug("auto-send decision", {
+        source: "conversation",
+        sendingAutomatically: false,
+        reason: "autoSendAfterSilence disabled",
+      });
+      transition("transcript_ready");
       return;
     }
 
     if (correction && (correction.confidence === "low" || correction.needsUserReview)) {
-      debug("low confidence; leaving transcript for manual review");
-      transition("waiting_for_speech");
+      debug("auto-send decision", {
+        source: "conversation",
+        sendingAutomatically: false,
+        reason: "low confidence or needs review",
+        confidence: correction.confidence,
+      });
+      transition("transcript_ready");
       options.onError("La transcripcion necesita revision. Corrige el texto y envia manualmente.");
       return;
     }
@@ -326,7 +350,12 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
     const turnId = currentTurn.id;
     const dropReason = shouldDropText(finalText, turnId);
     if (dropReason) {
-      debug("drop turn", dropReason, finalText);
+      debug("auto-send decision", {
+        source: "conversation",
+        sendingAutomatically: false,
+        reason: dropReason,
+        finalTranscript: finalText,
+      });
       resetTurn(true);
       returnToWaiting(450);
       return;
@@ -338,6 +367,12 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
     lastSentUserTextAt = now();
     recentTurnHashes = [normalizeText(finalText).slice(0, 120), ...recentTurnHashes].slice(0, 10);
 
+    debug("auto-send decision", {
+      source: "conversation",
+      sendingAutomatically: true,
+      finalTranscript: finalText,
+      turnId,
+    });
     transition("sending_to_ai");
 
     try {
@@ -632,6 +667,7 @@ export function createVoiceCallController(options: VoiceCallControllerOptions) {
       if (!active) return;
       paused = false;
       shouldRestartRecognition = true;
+      resetTurn(true);
       transition("waiting_for_speech");
       startRecognition();
     },

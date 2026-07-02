@@ -101,7 +101,10 @@ export default function AssistantWidget({
     };
   }, []);
 
-  async function sendMessage(customText?: string) {
+  async function sendMessage(
+    customText?: string,
+    options: { source: "manual" } = { source: "manual" },
+  ) {
     const messageText = (customText ?? input).trim();
     if (!messageText || isSending) return;
 
@@ -122,6 +125,7 @@ export default function AssistantWidget({
         tenantId: TENANT_ID,
         clientId: publicConfig.clientId || CLIENT_ID,
         channel: "chat",
+        source: options.source,
       });
 
       const botMessage: Message = {
@@ -181,7 +185,7 @@ export default function AssistantWidget({
   function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") {
       e.preventDefault();
-      void sendMessage();
+      void sendMessage(input, { source: "manual" });
     }
   }
 
@@ -311,7 +315,7 @@ export default function AssistantWidget({
             {quickReplies.map((item) => (
               <button
                 key={item}
-                onClick={() => void sendMessage(item)}
+                onClick={() => void sendMessage(item, { source: "manual" })}
                 style={{
                   border: "1px solid rgba(250, 204, 21, 0.45)",
                   background: "#fff7cc",
@@ -433,7 +437,7 @@ export default function AssistantWidget({
             </button>
 
             <button
-              onClick={() => void sendMessage()}
+              onClick={() => void sendMessage(input, { source: "manual" })}
               disabled={isSending}
               style={{
                 background: primaryColor,

@@ -140,7 +140,143 @@ app.get("/client/list", async (req, res) => {
  */
 
 function normalizeText(text = "") {
-  return text.trim().toLowerCase();
+  return String(text)
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
+function isDevelopmentMode() {
+  return process.env.NODE_ENV === "development";
+}
+
+function logBackendDebug(label, payload = {}) {
+  if (!isDevelopmentMode()) return;
+  console.log(`[backend-dev] ${label}`, payload);
+}
+
+function isDentalClinic(clientConfig = {}) {
+  const industry = normalizeText(clientConfig.industry || "");
+  const services = (clientConfig.services || []).join(" ");
+  const faq = (clientConfig.faq || [])
+    .map((item) => `${item.question || ""} ${item.answer || ""}`)
+    .join(" ");
+  const combined = normalizeText(`${industry} ${services} ${faq}`);
+
+  return [
+    "dental",
+    "dentista",
+    "odontologia",
+    "odontologico",
+    "ortodoncia",
+    "endodoncia",
+    "implante",
+  ].some((term) => combined.includes(term));
+}
+
+function hasAnyTerm(text = "", terms = []) {
+  return terms.some((term) => text.includes(normalizeText(term)));
+}
+
+function getLeadFieldsText(clientConfig = {}) {
+  const fields = clientConfig.leadFields || [];
+  if (!fields.length) return "tus datos de contacto";
+
+  const normalized = fields
+    .map((field) => {
+      const raw = String(field).trim();
+      const fieldText = normalizeText(raw);
+
+      if (fieldText === "nombre completo") return "tu nombre completo";
+      if (fieldText === "nombre") return "tu nombre";
+      if (fieldText === "edad") return "edad";
+      if (fieldText === "alergias") return "si tienes alergias";
+      if (fieldText === "motivo de consulta") return "el motivo de consulta";
+      if (fieldText === "whatsapp") return "tu WhatsApp";
+      if (fieldText === "telefono" || fieldText === "celular") {
+        return "tu teléfono";
+      }
+
+      return raw.charAt(0).toLowerCase() + raw.slice(1);
+    })
+    .filter(Boolean);
+  if (normalized.length <= 1) return normalized[0] || "tus datos de contacto";
+
+  return `${normalized.slice(0, -1).join(", ")} y ${normalized.at(-1)}`;
+}
+
+function getConfiguredLocation(clientConfig = {}) {
+  const location = String(clientConfig.location || "").trim();
+  if (!location) return "";
+
+  const normalized = normalizeText(location);
+  const placeholderTerms = [
+    "agrega aqui",
+    "inserta direccion",
+    "insertar direccion",
+    "direccion real",
+    "pendiente",
+    "por definir",
+    "placeholder",
+  ];
+
+  return placeholderTerms.some((term) => normalized.includes(term))
+    ? ""
+    : location;
+}
+
+function formatBusinessHours(hours = "") {
+  const text = String(hours || "").trim().replace(/[.。]+$/u, "");
+  if (!text) return "";
+  return text.charAt(0).toLowerCase() + text.slice(1);
+}
+
+function findMatchingFaq(clientConfig = {}, message = "", intent = "") {
+  const text = normalizeText(message);
+  const faq = clientConfig.faq || [];
+
+  return faq.find((item) => {
+    const question = normalizeText(item.question || "");
+    const answer = normalizeText(item.answer || "");
+    const combined = `${question} ${answer}`;
+
+    if (!combined.trim()) return false;
+
+    if (intent === "hours") {
+      return hasAnyTerm(combined, ["horario", "hora", "atencion"]);
+    }
+
+    if (intent === "location") {
+      return hasAnyTerm(combined, ["ubicacion", "direccion", "ubicados", "donde estan"]);
+    }
+
+    if (text.includes("brackets") && combined.includes("brackets")) {
+      return true;
+    }
+
+    return question
+      .split(/\s+/)
+      .some((word) => word.length > 4 && text.includes(word));
+  });
+}
+
+function findMatchingService(clientConfig = {}, message = "") {
+  const text = normalizeText(message);
+
+  return (clientConfig.services || []).find((service) => {
+    const normalizedService = normalizeText(service);
+    if (!normalizedService) return false;
+
+    if (text.includes(normalizedService)) return true;
+    if (text.includes("brackets") && normalizedService.includes("ortodoncia")) {
+      return true;
+    }
+
+    return normalizedService
+      .split(/\s+/)
+      .some((word) => word.length > 4 && text.includes(word));
+  });
 }
 
 function countWords(text = "") {
@@ -240,10 +376,48 @@ function wantsDemo(text) {
   ].some((term) => lower.includes(term));
 }
 
-function detectOffTopicMessage(message = "") {
+function detectOffTopicMessage(message = "", clientConfig = {}) {
   const text = normalizeText(message);
 
-  if (!text) return false;
+  if (!text) {
+    return {
+      offTopic: false,
+      reason: "empty-message",
+    };
+  }
+
+  const dentalAllowedTerms = [
+    "dolor de muela",
+    "dolor dental",
+    "dolor",
+    "muela",
+    "urgencia",
+    "emergencia dental",
+    "emergencia",
+    "inflamacion",
+    "sangrado",
+    "infeccion",
+    "brackets",
+    "ortodoncia",
+    "endodoncia",
+    "implantes",
+    "horarios",
+    "horario",
+    "ubicacion",
+    "direccion",
+    "citas",
+    "cita",
+    "agendar",
+    "contacto",
+    "whatsapp",
+  ];
+
+  if (isDentalClinic(clientConfig) && hasAnyTerm(text, dentalAllowedTerms)) {
+    return {
+      offTopic: false,
+      reason: "dental-allowed-intent",
+    };
+  }
 
   const businessKeywords = [
     "precio",
@@ -307,6 +481,12 @@ function detectOffTopicMessage(message = "") {
     "implantes",
     "limpieza dental",
     "urgencia dental",
+    "dolor dental",
+    "dolor de muela",
+    "muela",
+    "emergencia dental",
+    "emergencia",
+    "inflamacion",
     "dolor",
     "infeccion",
     "infección",
@@ -377,7 +557,10 @@ function detectOffTopicMessage(message = "") {
   ];
 
   if (obviousOffTopic.some((term) => text.includes(term))) {
-    return true;
+    return {
+      offTopic: true,
+      reason: "obvious-offtopic-keyword",
+    };
   }
 
   const hasBusinessIntent = businessKeywords.some((term) =>
@@ -401,14 +584,23 @@ function detectOffTopicMessage(message = "") {
   ];
 
   if (veryShortAllowed.includes(text)) {
-    return false;
+    return {
+      offTopic: false,
+      reason: "short-allowed",
+    };
   }
 
   if (!hasBusinessIntent && countWords(text) >= 4) {
-    return true;
+    return {
+      offTopic: true,
+      reason: "no-business-intent",
+    };
   }
 
-  return false;
+  return {
+    offTopic: false,
+    reason: hasBusinessIntent ? "business-keyword" : "short-message",
+  };
 }
 
 function getOriginForProvider(req) {
@@ -828,12 +1020,17 @@ function buildBaseContext(tenant) {
   const leadFields = clientConfig.leadFields
     .map((item) => `- ${item}`)
     .join("\n");
+  const appointmentTypes = (clientConfig.appointmentTypes || [])
+    .map((item) => `- ${item}`)
+    .join("\n");
 
   return `
 Marca: NYT Assistant
 Empresa/tenant: ${clientConfig.businessName || tenant?.name || "NYT Assistant"}
 Industria: ${clientConfig.industry}
 Asistente configurado: ${clientConfig.assistantName}
+Horario configurado: ${clientConfig.businessHours || "No configurado"}
+Ubicacion configurada: ${getConfiguredLocation(clientConfig) || "No configurada"}
 
 Presentacion obligatoria si el usuario pregunta quien eres:
 Soy ${clientConfig.assistantName}, configurado para atender a ${clientConfig.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.
@@ -850,6 +1047,9 @@ ${services}
 
 Preguntas frecuentes:
 ${faq}
+
+Tipos de cita:
+${appointmentTypes}
 
 Tono general: ${tone}
 
@@ -1103,34 +1303,149 @@ async function openAIResponsesText({
   return text || "";
 }
 
+function resolveConfiguredReply({ clientConfig, message }) {
+  const text = normalizeText(message);
+  const matchedService = findMatchingService(clientConfig, message);
+  let matchedFaq = null;
+  let intent = "";
+
+  const hoursIntent = hasAnyTerm(text, [
+    "horario",
+    "horarios",
+    "a que hora",
+    "hora de atencion",
+    "abren",
+    "cierran",
+  ]);
+  const locationIntent = hasAnyTerm(text, [
+    "ubicacion",
+    "ubicados",
+    "donde estan",
+    "direccion",
+    "domicilio",
+  ]);
+  const dentalPainIntent =
+    isDentalClinic(clientConfig) &&
+    hasAnyTerm(text, [
+      "dolor de muela",
+      "dolor dental",
+      "me duele una muela",
+      "me duele la muela",
+      "muela",
+      "infeccion",
+      "sangrado",
+      "inflamacion",
+      "urgencia",
+      "emergencia dental",
+      "emergencia",
+    ]);
+
+  if (dentalPainIntent) {
+    return {
+      reply: `Lamento que tengas dolor. No puedo diagnosticar ni recomendar medicamentos, pero por dolor dental lo más recomendable es que el equipo te valore lo antes posible. Puedo ayudarte a canalizar tu solicitud. ¿Me compartes ${getLeadFieldsText(clientConfig)}?`,
+      intent: "dental-pain",
+      matchedService,
+      matchedFaq: null,
+    };
+  }
+
+  if (hoursIntent) {
+    intent = "hours";
+    matchedFaq = findMatchingFaq(clientConfig, message, intent);
+
+    if (clientConfig.businessHours) {
+      return {
+        reply: `El horario de atención es de ${formatBusinessHours(clientConfig.businessHours)}.`,
+        intent,
+        matchedService,
+        matchedFaq,
+      };
+    }
+
+    if (matchedFaq?.answer) {
+      return {
+        reply: matchedFaq.answer,
+        intent,
+        matchedService,
+        matchedFaq,
+      };
+    }
+
+    return {
+      reply:
+        "No tengo el horario configurado todavía, pero puedo canalizarte con el equipo.",
+      intent,
+      matchedService,
+      matchedFaq: null,
+    };
+  }
+
+  if (locationIntent) {
+    intent = "location";
+    const location = getConfiguredLocation(clientConfig);
+    matchedFaq = findMatchingFaq(clientConfig, message, intent);
+
+    return {
+      reply: location
+        ? `Estamos ubicados en ${location}.`
+        : "No tengo la dirección configurada todavía, pero puedo canalizarte con el equipo para compartirte la ubicación correcta.",
+      intent,
+      matchedService,
+      matchedFaq,
+    };
+  }
+
+  if (matchedService) {
+    matchedFaq = findMatchingFaq(clientConfig, message, "service");
+    return {
+      reply:
+        matchedFaq?.answer ||
+        `Sí, contamos con servicio de ${matchedService}. Se recomienda agendar una valoración para revisar el caso.`,
+      intent: "service",
+      matchedService,
+      matchedFaq,
+    };
+  }
+
+  matchedFaq = findMatchingFaq(clientConfig, message);
+  if (matchedFaq?.answer) {
+    return {
+      reply: matchedFaq.answer,
+      intent: "faq",
+      matchedService,
+      matchedFaq,
+    };
+  }
+
+  return {
+    reply: "",
+    intent: "",
+    matchedService,
+    matchedFaq,
+  };
+}
+
 function generateLocalFallbackReply({ tenant, message, channel = "chat" }) {
   const clientConfig = normalizeClientConfig(tenant?.config?.clientConfig || {});
   const text = normalizeText(message);
   const services = clientConfig.services.join(", ");
-  const industry = normalizeText(clientConfig.industry);
-  const leadFields = clientConfig.leadFields.slice(0, 3).join(", ");
-  const urgentTerms = ["dolor", "infeccion", "infección", "sangrado", "urgencia", "emergencia"];
+  const leadFields = getLeadFieldsText(clientConfig);
+  const configuredReply = resolveConfiguredReply({ clientConfig, message });
 
+  if (configuredReply.reply) {
+    return configuredReply.reply;
+  }
   if (text.includes("quien eres") || text.includes("quién eres")) {
     return `Soy ${clientConfig.assistantName}, configurado para atender a ${clientConfig.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`;
   }
 
-  if (industry.includes("dental") && urgentTerms.some((term) => text.includes(term))) {
-    return `Por seguridad, te recomiendo una valoracion profesional con ${clientConfig.businessName} lo antes posible. Puedo tomar nombre, motivo, urgencia, horario preferido y WhatsApp para canalizarte.`;
-  }
-
-  const matchedFaq = clientConfig.faq.find((item) => {
-    const question = normalizeText(item.question || "");
-    return question && question.split(/\s+/).some((word) => word.length > 4 && text.includes(word));
-  });
+  const matchedFaq = findMatchingFaq(clientConfig, message);
 
   if (matchedFaq) {
     return `${matchedFaq.answer} Para canalizarte mejor, comparte ${leadFields}.`;
   }
 
-  const matchedService = clientConfig.services.find((service) =>
-    text.includes(normalizeText(service).split(" ")[0])
-  );
+  const matchedService = findMatchingService(clientConfig, message);
 
   if (matchedService || text.includes("servicio") || text.includes("informacion")) {
     return `${clientConfig.businessName} puede orientarte sobre: ${services}. Puedo canalizar tu solicitud al equipo. Que servicio te interesa?`;
@@ -1149,7 +1464,12 @@ function generateLocalFallbackReply({ tenant, message, channel = "chat" }) {
     return `Claro. Soy ${clientConfig.assistantName} para ${clientConfig.businessName}. Te puedo orientar y canalizar con el equipo. Que necesitas revisar?`;
   }
 
-  return `Con gusto. ${clientConfig.businessName} atiende ${clientConfig.industry.toLowerCase()} y puede orientarte en ${services}. Para ayudarte mejor, dime ${leadFields}.`;
+  const appointmentTypes = (clientConfig.appointmentTypes || []).join(", ");
+  const appointmentText = appointmentTypes
+    ? ` Maneja ${appointmentTypes}.`
+    : "";
+
+  return `Con gusto. ${clientConfig.businessName} atiende ${clientConfig.industry.toLowerCase()} y puede orientarte en ${services}.${appointmentText} Para ayudarte mejor, dime ${leadFields}.`;
 }
 
 async function transcribeAudioWithOpenAI(file) {
@@ -1260,6 +1580,16 @@ ${buildLeadInstruction(clientConfig, leadSignal)}
   const openAIModel = process.env.OPENAI_MODEL || "gpt-4o-mini";
   const openRouterModel =
     process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
+  const configuredReply = resolveConfiguredReply({ clientConfig, message });
+
+  if (configuredReply.reply) {
+    return {
+      reply: configuredReply.reply,
+      providerUsed: "configured-rules",
+      matchedService: configuredReply.matchedService || null,
+      matchedFaq: configuredReply.matchedFaq?.question || null,
+    };
+  }
 
   if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
     return {
@@ -1668,7 +1998,22 @@ app.post("/chat", requireTenant, async (req, res) => {
       Boolean(requestClientConfig.features?.multiAgentVoices) &&
       agentRuntimeConfig.multiAgentVoicesEnabled;
 
-    const isOffTopic = detectOffTopicMessage(message);
+    logBackendDebug("request-context", {
+      clientId:
+        req.body?.clientId ||
+        req.headers["x-client-id"] ||
+        req.query?.clientId ||
+        requestClientConfig.clientId,
+      businessName: requestClientConfig.businessName,
+    });
+
+    const offTopicResult = detectOffTopicMessage(message, requestClientConfig);
+    const isOffTopic = offTopicResult.offTopic;
+
+    logBackendDebug("offtopic-guard", {
+      offTopic: offTopicResult.offTopic,
+      reason: offTopicResult.reason,
+    });
 
     if (isOffTopic) {
       const currentAssistant = getAssistantConfig(previousAssistantId);
@@ -1678,6 +2023,12 @@ app.post("/chat", requireTenant, async (req, res) => {
       appendConversationMessage(conversationId, "user", message);
       appendConversationMessage(conversationId, "assistant", reply);
       setStoredAssistant(conversationId, previousAssistantId);
+
+      logBackendDebug("reply-provider", {
+        providerUsed: "offtopic-guard",
+        matchedService: null,
+        matchedFaq: null,
+      });
 
       return res.json({
         reply,
@@ -1743,6 +2094,12 @@ app.post("/chat", requireTenant, async (req, res) => {
       channel,
       req,
       leadSignal,
+    });
+
+    logBackendDebug("reply-provider", {
+      providerUsed: ai.providerUsed,
+      matchedService: ai.matchedService || null,
+      matchedFaq: ai.matchedFaq || null,
     });
 
     const rawReply = ai.reply || "Hubo un problema al generar la respuesta.";

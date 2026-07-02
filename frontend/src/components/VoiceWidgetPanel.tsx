@@ -71,6 +71,8 @@ function mapCallStateToVoiceStatus(state: VoiceCallState): VoiceInputStatus {
     case "ending_user_turn":
     case "correcting_transcript":
       return "processing";
+    case "transcript_ready":
+      return "transcript_ready";
     case "sending_to_ai":
       return "sending";
     case "speaking":
@@ -279,6 +281,14 @@ export default function VoiceWidgetPanel({
     setVoiceStatus("sending");
     setErrorMessage("");
 
+    if (audioProviderConfig.callDebug) {
+      console.log("[voice-widget] sendMessage", {
+        source: options.source,
+        turnId: options.turnId || null,
+        text: clean,
+      });
+    }
+
     const { res, data } = await safeFetchJson(
       `${audioProviderConfig.apiUrl}/chat`,
       {
@@ -463,7 +473,7 @@ export default function VoiceWidgetPanel({
 
     try {
       const response = await sendMessage(clean, {
-        source: voiceMode === "conversation" ? "conversation" : "manual",
+        source: "manual",
       });
 
       setVoiceStatus("speaking");
@@ -473,11 +483,19 @@ export default function VoiceWidgetPanel({
         clientType: isMobileDevice() ? "mobile" : "desktop",
         onEngineChange: setAudioEngine,
       });
-      setVoiceStatus("ready");
+      if (conversationActive) {
+        getController().resumeCall();
+      } else {
+        setVoiceStatus("ready");
+      }
     } catch (error: any) {
       console.error(error);
       setErrorMessage(error?.message || "Error conectando con el asistente.");
-      setVoiceStatus("ready");
+      if (conversationActive) {
+        getController().resumeCall();
+      } else {
+        setVoiceStatus("ready");
+      }
     }
   }
 

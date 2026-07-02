@@ -20,6 +20,9 @@ export type AudioEngineStatus =
   | "Fallback de voz del navegador activo"
   | "Audio desactivado";
 
+export const autoSendAfterSilence =
+  import.meta.env.VITE_AUTO_SEND_AFTER_SILENCE === "true";
+
 export const audioProviderConfig = {
   audioProvider: import.meta.env.VITE_AUDIO_PROVIDER || "auto",
   sttProvider: import.meta.env.VITE_STT_PROVIDER || "browser",
@@ -45,8 +48,7 @@ export const audioProviderConfig = {
   vadEnergyThreshold: Number(import.meta.env.VITE_VAD_ENERGY_THRESHOLD || 0.025),
   interruptAssistantOnSpeech:
     import.meta.env.VITE_INTERRUPT_ASSISTANT_ON_SPEECH !== "false",
-  autoSendAfterSilence:
-    import.meta.env.VITE_AUTO_SEND_AFTER_SILENCE === "true",
+  autoSendAfterSilence,
   echoGuardEnabled: import.meta.env.VITE_ECHO_GUARD_ENABLED !== "false",
   bargeInEnabled: import.meta.env.VITE_BARGE_IN_ENABLED !== "false",
   bargeInMinMs: Number(import.meta.env.VITE_BARGE_IN_MIN_MS || 450),
