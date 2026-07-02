@@ -7,6 +7,11 @@ import AssistantsHub from "./pages/AssistantsHub";
 import VoiceWidgetPanel from "./components/VoiceWidgetPanel";
 import NeonCubeBackground from "./components/NeonCubeBackground";
 import { ASSISTANTS } from "./data/assistants";
+import {
+  buildAssistantIntro,
+  fallbackPublicClientConfig,
+  fetchPublicClientConfig,
+} from "./config/clientConfig";
 
 const API_URL =
   import.meta.env.VITE_API_URL?.replace(/\/+$/, "") || "http://localhost:3000";
@@ -16,6 +21,7 @@ function HomePage() {
     typeof window !== "undefined" ? window.innerWidth < 960 : false,
   );
   const [selectedDemoId, setSelectedDemoId] = useState("isis");
+  const [publicConfig, setPublicConfig] = useState(fallbackPublicClientConfig);
 
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 960);
@@ -23,10 +29,30 @@ function HomePage() {
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  useEffect(() => {
+    fetchPublicClientConfig()
+      .then(setPublicConfig)
+      .catch((error) =>
+        console.error("No se pudo cargar configuracion publica:", error),
+      );
+  }, []);
+
   const selectedDemoAssistant = useMemo(
-    () => ASSISTANTS.find((a) => a.id === selectedDemoId) || ASSISTANTS[0],
-    [selectedDemoId],
+    () =>
+      publicConfig.enabledFeatures.multiAgentVoices &&
+      publicConfig.audio?.elevenLabsActive
+        ? ASSISTANTS.find((a) => a.id === selectedDemoId) || ASSISTANTS[0]
+        : {
+            id: "main",
+            name: "NYT Assistant",
+            role: "Asistente principal",
+            color: "#dc2626",
+          },
+    [publicConfig, selectedDemoId],
   );
+  const multiAgentVoicesEnabled =
+    publicConfig.enabledFeatures.multiAgentVoices &&
+    Boolean(publicConfig.audio?.elevenLabsActive);
 
   const sectionWrap: React.CSSProperties = {
     maxWidth: "1200px",
@@ -238,6 +264,27 @@ function HomePage() {
   }
 
   function DemoSelector() {
+    if (!multiAgentVoicesEnabled) {
+      return (
+        <div
+          style={{
+            display: "grid",
+            gap: "8px",
+            marginBottom: "18px",
+            padding: "14px 16px",
+            borderRadius: "18px",
+            background: "rgba(255,255,255,0.04)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            color: "rgba(255,255,255,0.72)",
+            fontSize: "14px",
+            lineHeight: 1.6,
+          }}
+        >
+          Voz principal activa. Las voces multiagente se habilitan cuando ElevenLabs esta configurado.
+        </div>
+      );
+    }
+
     return (
       <div
         style={{
@@ -889,7 +936,7 @@ function HomePage() {
 
       <AssistantWidget
         title="NYT Assistant"
-        welcomeMessage="Hola 👋 Soy NYT Assistant. ¿En qué puedo ayudarte hoy?"
+        welcomeMessage={buildAssistantIntro()}
         primaryColor="#dc2626"
         apiUrl={`${API_URL}/chat`}
       />

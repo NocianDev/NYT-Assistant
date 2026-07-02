@@ -1,0 +1,45 @@
+{
+  "clientId": "restaurante-demo",
+  "businessName": "Restaurante Demo",
+  "industry": "Restaurante",
+  "assistantName": "NYT Assistant",
+  "tone": "amable, rapido y claro",
+  "services": [
+    "Reservaciones",
+    "Menu",
+    "Eventos",
+    "Pedidos"
+  ],
+  "faq": [
+    {
+      "question": "Puedo reservar para un evento?",
+      "answer": "Si, se puede tomar fecha, numero de personas y datos de contacto para seguimiento."
+    }
+  ],
+  "rules": [
+    "No confirmar disponibilidad sin validacion del equipo",
+    "No prometer precios finales sin menu o paquete confirmado",
+    "Pedir fecha y numero de personas para eventos o reservas"
+  ],
+  "leadFields": [
+    "Nombre",
+    "Tipo de solicitud",
+    "Fecha",
+    "Numero de personas",
+    "WhatsApp"
+  ],
+  "handoff": {
+    "whatsapp": "",
+    "email": "",
+    "instructions": "Canalizar al equipo del restaurante para confirmar disponibilidad."
+  },
+  "theme": {
+    "primaryColor": "#111827",
+    "accentColor": "#dc2626"
+  },
+  "features": {
+    "voice": true,
+    "leadCapture": true,
+    "multiAgentVoices": false
+  }
+}

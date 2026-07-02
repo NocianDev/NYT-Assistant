@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from "react";
 import axios from "axios";
+import { audioProviderConfig, type VoiceInputStatus } from "../audio/audioProvider";
+import { BrowserSpeechRecognizer } from "../audio/voiceInput";
+import { speakText } from "../audio/voiceOutput";
+import {
+  buildAssistantIntro,
+  fallbackPublicClientConfig,
+  fetchPublicClientConfig,
+  type PublicClientConfig,
+} from "../config/clientConfig";
 
 type Message = {
   role: "user" | "bot";
@@ -29,10 +38,25 @@ const API_URL =
   "http://localhost:3000";
 
 const TENANT_ID = import.meta.env.VITE_TENANT_ID;
+const CLIENT_ID = audioProviderConfig.clientId;
+
+const voiceStatusLabel: Record<VoiceInputStatus, string> = {
+  ready: "Listo",
+  listening: "Escuchando",
+  processing: "Procesando",
+  sending: "Enviando",
+  waiting_for_speech: "Esperando voz",
+  transcript_ready: "Texto detectado",
+  speaking: "Respondiendo",
+  interrupted: "Interrumpido",
+  "mic-error": "Error de microfono",
+  unsupported: "Reconocimiento no soportado",
+  disabled: "Desactivado",
+};
 
 export default function AssistantWidget({
   title = "NYT Assistant",
-  welcomeMessage = "Hola 👋 Soy NYT Assistant. Estoy listo para ayudarte con información, cotizaciones y atención para tu negocio.",
+  welcomeMessage = buildAssistantIntro(),
   apiUrl = `${API_URL}/chat`,
   primaryColor = "#dc2626",
 }: Props) {
@@ -42,13 +66,40 @@ export default function AssistantWidget({
   ]);
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<VoiceInputStatus>("ready");
+  const [voiceError, setVoiceError] = useState("");
+  const [audioEngine, setAudioEngine] = useState(
+    "Fallback de voz del navegador activo",
+  );
+  const [publicConfig, setPublicConfig] = useState<PublicClientConfig>(
+    fallbackPublicClientConfig,
+  );
 
   const chatEndRef = useRef<HTMLDivElement | null>(null);
   const conversationIdRef = useRef<string>(getOrCreateConversationId());
+  const recognizerRef = useRef<BrowserSpeechRecognizer | null>(null);
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, isOpen, isSending]);
+
+  useEffect(() => {
+    let mounted = true;
+
+    fetchPublicClientConfig(CLIENT_ID)
+      .then((config) => {
+        if (!mounted) return;
+        setPublicConfig(config);
+        setMessages([{ role: "bot", text: buildAssistantIntro(config) }]);
+      })
+      .catch((error) => {
+        console.error("No se pudo cargar config publica:", error);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   async function sendMessage(customText?: string) {
     const messageText = (customText ?? input).trim();
@@ -69,6 +120,7 @@ export default function AssistantWidget({
         message: messageText,
         conversationId: conversationIdRef.current,
         tenantId: TENANT_ID,
+        clientId: publicConfig.clientId || CLIENT_ID,
         channel: "chat",
       });
 
@@ -76,10 +128,17 @@ export default function AssistantWidget({
         role: "bot",
         text:
           res.data?.reply ||
-          "Te respondí correctamente, pero el servidor no devolvió texto.",
+          "Te respondi correctamente, pero el servidor no devolvio texto.",
       };
 
       setMessages([...newMessages, botMessage]);
+
+      void speakText({
+        text: res.data?.ttsText || botMessage.text,
+        assistantId: res.data?.assistantId || "isis",
+        clientType: "desktop",
+        onEngineChange: setAudioEngine,
+      });
     } catch (error: any) {
       console.error(error);
 
@@ -101,6 +160,7 @@ export default function AssistantWidget({
       await axios.post(`${API_URL}/chat/reset`, {
         conversationId: conversationIdRef.current,
         tenantId: TENANT_ID,
+        clientId: publicConfig.clientId || CLIENT_ID,
       });
 
       const newId =
@@ -112,7 +172,7 @@ export default function AssistantWidget({
       setMessages([{ role: "bot", text: welcomeMessage }]);
       setInput("");
     } catch (error) {
-      console.error("Error reiniciando conversación:", error);
+      console.error("Error reiniciando conversacion:", error);
       setMessages([{ role: "bot", text: welcomeMessage }]);
       setInput("");
     }
@@ -125,10 +185,61 @@ export default function AssistantWidget({
     }
   }
 
+  async function correctTranscript(rawTranscript: string) {
+    if (!audioProviderConfig.enableTranscriptCorrection || !rawTranscript.trim()) {
+      return rawTranscript;
+    }
+
+    try {
+      const response = await axios.post(
+        `${API_URL}/voice/correct-transcript`,
+        {
+          clientId: publicConfig.clientId || CLIENT_ID,
+          rawTranscript,
+        },
+      );
+
+      return response.data?.correctedTranscript || rawTranscript;
+    } catch (error) {
+      console.error("No se pudo corregir transcripcion:", error);
+      return rawTranscript;
+    }
+  }
+
+  function toggleDictation() {
+    setVoiceError("");
+
+    if (voiceStatus === "listening") {
+      recognizerRef.current?.stop();
+      return;
+    }
+
+    const recognizer = new BrowserSpeechRecognizer({
+      onTranscript: (text, isFinal) => {
+        setInput(text);
+        if (isFinal) {
+          void correctTranscript(text).then(setInput);
+        }
+      },
+      onStatusChange: setVoiceStatus,
+      onError: setVoiceError,
+    });
+
+    recognizerRef.current = recognizer;
+
+    if (!recognizer.isSupported()) {
+      setVoiceStatus("unsupported");
+      setVoiceError("Reconocimiento no soportado en este navegador.");
+      return;
+    }
+
+    recognizer.start();
+  }
+
   const quickReplies = [
-    "Quiero una cotización",
+    "Quiero una cotizacion",
     "Necesito un asistente para mi negocio",
-    "¿Pueden automatizar WhatsApp?",
+    "Pueden automatizar WhatsApp?",
     "Quiero una demo",
   ];
 
@@ -165,7 +276,7 @@ export default function AssistantWidget({
             <div>
               <div style={{ fontWeight: 800, fontSize: "16px" }}>{title}</div>
               <div style={{ fontSize: "12px", opacity: 0.8 }}>
-                Atención automatizada en tiempo real
+                Atencion automatizada en tiempo real
               </div>
             </div>
 
@@ -183,7 +294,7 @@ export default function AssistantWidget({
               }}
               aria-label="Cerrar chat"
             >
-              ✕
+              x
             </button>
           </div>
 
@@ -230,7 +341,7 @@ export default function AssistantWidget({
           >
             {messages.map((msg, i) => (
               <div
-                key={i}
+                key={`${msg.role}-${i}`}
                 style={{
                   display: "flex",
                   justifyContent:
@@ -291,9 +402,10 @@ export default function AssistantWidget({
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Escribe tu mensaje..."
+              placeholder="Escribe o dicta tu mensaje..."
               style={{
                 flex: 1,
+                minWidth: 0,
                 padding: "12px 14px",
                 borderRadius: "12px",
                 border: "1px solid #d1d5db",
@@ -301,6 +413,24 @@ export default function AssistantWidget({
                 fontSize: "14px",
               }}
             />
+
+            <button
+              onClick={toggleDictation}
+              type="button"
+              title={voiceStatusLabel[voiceStatus]}
+              style={{
+                background:
+                  voiceStatus === "listening" ? "#16a34a" : "#f8fafc",
+                color: voiceStatus === "listening" ? "#ffffff" : "#111827",
+                border: "1px solid #d1d5db",
+                padding: "12px 13px",
+                borderRadius: "12px",
+                cursor: "pointer",
+                fontWeight: 800,
+              }}
+            >
+              {voiceStatus === "listening" ? "■" : "Mic"}
+            </button>
 
             <button
               onClick={() => void sendMessage()}
@@ -315,7 +445,7 @@ export default function AssistantWidget({
                 opacity: isSending ? 0.7 : 1,
               }}
             >
-              ➤
+              Enviar
             </button>
           </div>
 
@@ -326,6 +456,7 @@ export default function AssistantWidget({
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
+              gap: "10px",
               background: "#fffdf7",
             }}
           >
@@ -333,9 +464,12 @@ export default function AssistantWidget({
               style={{
                 fontSize: "12px",
                 color: "#64748b",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
               }}
             >
-              Conversación activa
+              {voiceStatusLabel[voiceStatus]} · {audioEngine}
             </span>
 
             <button
@@ -347,11 +481,25 @@ export default function AssistantWidget({
                 fontSize: "12px",
                 fontWeight: 700,
                 cursor: "pointer",
+                flexShrink: 0,
               }}
             >
               Reiniciar
             </button>
           </div>
+
+          {voiceError && (
+            <div
+              style={{
+                padding: "8px 12px",
+                background: "#fef2f2",
+                color: "#991b1b",
+                fontSize: "12px",
+              }}
+            >
+              {voiceError}
+            </div>
+          )}
         </div>
       )}
 
@@ -366,14 +514,16 @@ export default function AssistantWidget({
           borderRadius: "50%",
           background: `linear-gradient(135deg, ${primaryColor}, #991b1b)`,
           border: "none",
-          fontSize: "24px",
+          fontSize: "14px",
           cursor: "pointer",
           boxShadow: "0 18px 40px rgba(245, 158, 11, 0.35)",
           zIndex: 9999,
+          color: "#111827",
+          fontWeight: 900,
         }}
         aria-label="Abrir chat"
       >
-        💬
+        Chat
       </button>
     </>
   );

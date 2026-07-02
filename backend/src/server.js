@@ -8,6 +8,20 @@ import FormData from "form-data";
 
 import Lead from "./models/Lead.js";
 import Tenant from "./models/Tenant.js";
+import {
+  DEFAULT_CLIENT_ID,
+  getClientConfig,
+  getPublicClientConfig,
+  getPublicClientConfigFromFull,
+  listAvailableClients,
+  normalizeClientConfig as normalizeBackendClientConfig,
+} from "./services/clientConfigService.js";
+import { correctTranscript } from "./agents/speechCorrectionAgent.js";
+import {
+  buildLeadInstruction,
+  extractLeadSignal,
+} from "./agents/leadExtractionAgent.js";
+import { getAgentConfig, getVoiceIdForAgent } from "./config/agentConfig.js";
 
 dotenv.config();
 
@@ -16,12 +30,16 @@ console.log("OPENROUTER_API_KEY existe:", !!process.env.OPENROUTER_API_KEY);
 console.log("OPENAI_API_KEY existe:", !!process.env.OPENAI_API_KEY);
 console.log("ELEVENLABS_API_KEY existe:", !!process.env.ELEVENLABS_API_KEY);
 
-mongoose
-  .connect(process.env.MONGODB_URI, {
-    serverSelectionTimeoutMS: 10000,
-  })
-  .then(() => console.log("Mongo conectado"))
-  .catch((err) => console.error("Error conectando Mongo:", err));
+if (process.env.MONGODB_URI) {
+  mongoose
+    .connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    })
+    .then(() => console.log("Mongo conectado"))
+    .catch((err) => console.error("Error conectando Mongo:", err));
+} else {
+  console.warn("MONGODB_URI no configurado. Demo local sin persistencia.");
+}
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -62,6 +80,7 @@ app.use(
       "Content-Type",
       "x-admin-password",
       "x-tenant-id",
+      "x-client-id",
       "x-client-type",
     ],
     credentials: false,
@@ -76,6 +95,42 @@ app.get("/", (req, res) => {
 
 app.get("/health", (req, res) => {
   res.json({ ok: true });
+});
+
+app.get("/client/public-config/:clientId", async (req, res) => {
+  try {
+    const publicConfig = await getPublicClientConfig(req.params.clientId);
+    const agentConfig = getAgentConfig();
+
+    return res.json({
+      ...publicConfig,
+      enabledFeatures: {
+        ...publicConfig.enabledFeatures,
+        multiAgentVoices:
+          Boolean(publicConfig.enabledFeatures?.multiAgentVoices) &&
+          agentConfig.multiAgentVoicesEnabled,
+      },
+      audio: {
+        elevenLabsActive: agentConfig.multiAgentVoicesEnabled,
+        multiAgentVoicesEnabled: agentConfig.multiAgentVoicesEnabled,
+      },
+    });
+  } catch (error) {
+    console.error("Error cargando public config:", error.message);
+    return res.status(404).json({ error: "Cliente no encontrado" });
+  }
+});
+
+app.get("/client/list", async (req, res) => {
+  if (process.env.NODE_ENV !== "development") {
+    return res.status(404).json({ error: "No disponible" });
+  }
+
+  try {
+    return res.json({ clients: await listAvailableClients() });
+  } catch (error) {
+    return res.status(500).json({ error: "No se pudieron listar clientes" });
+  }
 });
 
 /**
@@ -238,6 +293,44 @@ function detectOffTopicMessage(message = "") {
     "funciona",
     "como funciona",
     "cómo funciona",
+    "quien eres",
+    "quién eres",
+    "dentista",
+    "dental",
+    "odontologia",
+    "odontología",
+    "odontologico",
+    "odontológico",
+    "brackets",
+    "ortodoncia",
+    "endodoncia",
+    "implantes",
+    "limpieza dental",
+    "urgencia dental",
+    "dolor",
+    "infeccion",
+    "infección",
+    "sangrado",
+    "legal",
+    "abogado",
+    "contrato",
+    "mercantil",
+    "empresa",
+    "cobranza",
+    "flete",
+    "logistica",
+    "logística",
+    "origen",
+    "destino",
+    "carga",
+    "rastreo",
+    "restaurante",
+    "reservacion",
+    "reservación",
+    "menu",
+    "menú",
+    "pedido",
+    "evento",
   ];
 
   const obviousOffTopic = [
@@ -340,6 +433,62 @@ function detectClientType(req) {
   return isMobile ? "mobile" : "desktop";
 }
 
+function normalizeClientConfig(rawConfig = {}) {
+  return normalizeBackendClientConfig(rawConfig);
+}
+
+function createDemoTenant(clientConfig = {}) {
+  const config = normalizeClientConfig(clientConfig);
+
+  return {
+    name: config.businessName,
+    apiKey: "nyt_demo_1",
+    adminPassword: process.env.ADMIN_PASSWORD || "demo",
+    config: {
+      tone: config.tone,
+      clientConfig: config,
+      primaryColor: "#dc2626",
+      welcomeMessage: `Soy ${config.assistantName}, configurado para atender a ${config.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`,
+    },
+    isLocalDemo: true,
+  };
+}
+
+async function resolveRequestClientConfig(req) {
+  const clientId =
+    req.body?.clientId ||
+    req.headers["x-client-id"] ||
+    req.query?.clientId ||
+    DEFAULT_CLIENT_ID;
+
+  if (req.body?.clientConfig) {
+    return normalizeClientConfig({
+      ...(await getClientConfig(clientId)),
+      ...req.body.clientConfig,
+      clientId,
+    });
+  }
+
+  return getClientConfig(clientId);
+}
+
+function mergeTenantClientConfig(tenant, clientConfig = {}) {
+  const normalized = normalizeClientConfig({
+    ...(tenant?.config?.clientConfig || {}),
+    ...clientConfig,
+  });
+
+  return {
+    ...tenant,
+    name: normalized.businessName || tenant?.name,
+    config: {
+      ...(tenant?.config || {}),
+      tone: normalized.tone || tenant?.config?.tone,
+      clientConfig: normalized,
+    },
+  };
+}
+
 function shouldSpeakReply(reply = "", channel = "chat", transitionText = "") {
   if (channel !== "voice") return false;
 
@@ -436,10 +585,10 @@ function getStoredAssistant(conversationId) {
   const history = getConversationHistory(conversationId);
   for (let i = history.length - 1; i >= 0; i -= 1) {
     if (history[i]?.role === "system_assistant_meta") {
-      return history[i].content || "isis";
+      return history[i].content || "main";
     }
   }
-  return "isis";
+  return "main";
 }
 
 function setStoredAssistant(conversationId, assistantId) {
@@ -465,18 +614,30 @@ async function requireTenant(req, res, next) {
       req.headers["x-tenant-id"] ||
       req.body?.tenantId ||
       req.query?.tenantId;
+    const requestClientConfig = await resolveRequestClientConfig(req);
 
     if (!tenantId) {
-      return res.status(400).json({ error: "Falta tenantId" });
+      req.tenant = createDemoTenant(requestClientConfig);
+      req.clientConfig = requestClientConfig;
+      return next();
+    }
+
+    if (!process.env.MONGODB_URI || mongoose.connection.readyState !== 1) {
+      req.tenant = createDemoTenant(requestClientConfig);
+      req.clientConfig = requestClientConfig;
+      return next();
     }
 
     const tenant = await Tenant.findOne({ apiKey: tenantId });
 
     if (!tenant) {
-      return res.status(404).json({ error: "Tenant no encontrado" });
+      req.tenant = createDemoTenant(requestClientConfig);
+      req.clientConfig = requestClientConfig;
+      return next();
     }
 
-    req.tenant = tenant;
+    req.tenant = mergeTenantClientConfig(tenant.toObject(), requestClientConfig);
+    req.clientConfig = requestClientConfig;
     next();
   } catch (error) {
     console.error("Error en requireTenant:", error.message);
@@ -491,6 +652,22 @@ async function requireTenant(req, res, next) {
  */
 
 const ASSISTANT_CONFIG = {
+  main: {
+    id: "main",
+    name: "NYT Assistant",
+    color: "#dc2626",
+    voiceId: process.env.ELEVENLABS_MAIN_VOICE_ID || process.env.ELEVENLABS_VOICE_ID,
+    handoff: "",
+    intro: "",
+    prompt: `
+Eres NYT Assistant.
+Tu funcion es atender clientes de negocios configurados por backend.
+Hablas con claridad, profesionalismo y naturalidad.
+Tu objetivo es orientar, responder sobre servicios, resolver preguntas frecuentes y canalizar solicitudes al equipo.
+No suenes robotico. No digas que eres una IA salvo que el usuario lo pregunte directamente.
+Mantente dentro de las reglas del cliente configurado.
+`,
+  },
   isis: {
     id: "isis",
     name: "Isis",
@@ -598,8 +775,12 @@ function getAssistantConfig(assistantId = "isis") {
 }
 
 function getVoiceIdForAssistant(assistantId = "isis") {
+  const agentVoiceId = getVoiceIdForAgent(assistantId);
+  if (agentVoiceId) return agentVoiceId;
+
   return (
     getAssistantConfig(assistantId)?.voiceId ||
+    process.env.ELEVENLABS_VOICE_ID ||
     process.env.ELEVENLABS_VOICE_ISIS
   );
 }
@@ -620,6 +801,7 @@ function buildOffTopicReplyFromCurrentAssistant(currentAssistantId = "isis") {
   const assistant = getAssistantConfig(currentAssistantId);
 
   const focusByAssistant = {
+    main: "informacion, servicios, preguntas frecuentes y canalizacion al equipo",
     isis: "recepción inicial, orientación del servicio y siguiente paso",
     osiris: "recepción inicial, organización de la atención y siguiente paso",
     freyja: "ventas, precios, demo y contacto comercial",
@@ -637,10 +819,24 @@ function buildOffTopicReplyFromCurrentAssistant(currentAssistantId = "isis") {
 
 function buildBaseContext(tenant) {
   const tone = tenant?.config?.tone || "mixto";
+  const clientConfig = normalizeClientConfig(tenant?.config?.clientConfig || {});
+  const services = clientConfig.services.map((item) => `- ${item}`).join("\n");
+  const faq = clientConfig.faq
+    .map((item) => `- ${item.question}\n  ${item.answer}`)
+    .join("\n");
+  const rules = clientConfig.rules.map((item) => `- ${item}`).join("\n");
+  const leadFields = clientConfig.leadFields
+    .map((item) => `- ${item}`)
+    .join("\n");
 
   return `
 Marca: NYT Assistant
-Empresa/tenant: ${tenant?.name || "NYT Assistant"}
+Empresa/tenant: ${clientConfig.businessName || tenant?.name || "NYT Assistant"}
+Industria: ${clientConfig.industry}
+Asistente configurado: ${clientConfig.assistantName}
+
+Presentacion obligatoria si el usuario pregunta quien eres:
+Soy ${clientConfig.assistantName}, configurado para atender a ${clientConfig.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.
 
 Objetivo general:
 - atender clientes
@@ -650,10 +846,10 @@ Objetivo general:
 - mover la conversación al siguiente paso correcto
 
 Servicios base:
-- atención automatizada
-- asistentes con IA
-- captación de leads
-- soporte comercial
+${services}
+
+Preguntas frecuentes:
+${faq}
 
 Tono general: ${tone}
 
@@ -669,6 +865,12 @@ Reglas globales:
 - evita hablar de temas ajenos al objetivo comercial o de atención
 - si el usuario intenta llevar la conversación a otro tema, responde breve y redirígelo al propósito principal
 - prioriza siempre ayudar dentro del rol actual del asistente
+
+Reglas del cliente:
+${rules}
+
+Campos de lead a recopilar cuando sea natural:
+${leadFields}
 `;
 }
 
@@ -901,6 +1103,55 @@ async function openAIResponsesText({
   return text || "";
 }
 
+function generateLocalFallbackReply({ tenant, message, channel = "chat" }) {
+  const clientConfig = normalizeClientConfig(tenant?.config?.clientConfig || {});
+  const text = normalizeText(message);
+  const services = clientConfig.services.join(", ");
+  const industry = normalizeText(clientConfig.industry);
+  const leadFields = clientConfig.leadFields.slice(0, 3).join(", ");
+  const urgentTerms = ["dolor", "infeccion", "infección", "sangrado", "urgencia", "emergencia"];
+
+  if (text.includes("quien eres") || text.includes("quién eres")) {
+    return `Soy ${clientConfig.assistantName}, configurado para atender a ${clientConfig.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`;
+  }
+
+  if (industry.includes("dental") && urgentTerms.some((term) => text.includes(term))) {
+    return `Por seguridad, te recomiendo una valoracion profesional con ${clientConfig.businessName} lo antes posible. Puedo tomar nombre, motivo, urgencia, horario preferido y WhatsApp para canalizarte.`;
+  }
+
+  const matchedFaq = clientConfig.faq.find((item) => {
+    const question = normalizeText(item.question || "");
+    return question && question.split(/\s+/).some((word) => word.length > 4 && text.includes(word));
+  });
+
+  if (matchedFaq) {
+    return `${matchedFaq.answer} Para canalizarte mejor, comparte ${leadFields}.`;
+  }
+
+  const matchedService = clientConfig.services.find((service) =>
+    text.includes(normalizeText(service).split(" ")[0])
+  );
+
+  if (matchedService || text.includes("servicio") || text.includes("informacion")) {
+    return `${clientConfig.businessName} puede orientarte sobre: ${services}. Puedo canalizar tu solicitud al equipo. Que servicio te interesa?`;
+  }
+
+  if (
+    text.includes("precio") ||
+    text.includes("costo") ||
+    text.includes("cotizacion") ||
+    text.includes("cotización")
+  ) {
+    return `Puedo ayudarte a canalizar una cotizacion con ${clientConfig.businessName}. Para avanzar, comparte ${leadFields}.`;
+  }
+
+  if (channel === "voice") {
+    return `Claro. Soy ${clientConfig.assistantName} para ${clientConfig.businessName}. Te puedo orientar y canalizar con el equipo. Que necesitas revisar?`;
+  }
+
+  return `Con gusto. ${clientConfig.businessName} atiende ${clientConfig.industry.toLowerCase()} y puede orientarte en ${services}. Para ayudarte mejor, dime ${leadFields}.`;
+}
+
 async function transcribeAudioWithOpenAI(file) {
   const formData = new FormData();
 
@@ -976,11 +1227,9 @@ async function generateAIReply({
   conversationId,
   channel = "chat",
   req,
+  leadSignal,
 }) {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error("Falta configurar OPENAI_API_KEY");
-  }
-
+  const clientConfig = normalizeClientConfig(tenant?.config?.clientConfig || {});
   const systemPrompt = `${buildAssistantPrompt(assistantId, tenant)}
 
 Canal actual: ${channel}
@@ -991,6 +1240,9 @@ Instrucciones del canal:
 - si falta contexto, pide solo lo importante
 - si el mensaje es claro, avanza sin rodeos
 - cuando haya interés comercial, busca el siguiente paso: nombre, WhatsApp o demo
+
+Instrucciones de lead:
+${buildLeadInstruction(clientConfig, leadSignal)}
 `;
 
   const history = getConversationHistory(conversationId).filter(
@@ -1009,7 +1261,21 @@ Instrucciones del canal:
   const openRouterModel =
     process.env.OPENROUTER_MODEL || "openai/gpt-4o-mini";
 
+  if (!process.env.OPENAI_API_KEY && !process.env.OPENROUTER_API_KEY) {
+    return {
+      reply: generateLocalFallbackReply({ tenant, message, channel }),
+      providerUsed: "local-demo-fallback",
+    };
+  }
+
   if (clientType === "mobile") {
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        reply: generateLocalFallbackReply({ tenant, message, channel }),
+        providerUsed: "local-demo-fallback",
+      };
+    }
+
     const text = await openAIResponsesText({
       model: openAIModel,
       systemPrompt,
@@ -1052,17 +1318,35 @@ Instrucciones del canal:
   } catch (error) {
     console.error("Fallback a OpenAI:", error.response?.data || error.message);
 
-    const text = await openAIResponsesText({
-      model: openAIModel,
-      systemPrompt,
-      history: normalizedHistory,
-      userMessage: message,
-    });
+    if (!process.env.OPENAI_API_KEY) {
+      return {
+        reply: generateLocalFallbackReply({ tenant, message, channel }),
+        providerUsed: "local-demo-fallback",
+      };
+    }
 
-    return {
-      reply: text || "Hubo un problema al generar la respuesta.",
-      providerUsed: "openai-fallback",
-    };
+    try {
+      const text = await openAIResponsesText({
+        model: openAIModel,
+        systemPrompt,
+        history: normalizedHistory,
+        userMessage: message,
+      });
+
+      return {
+        reply: text || generateLocalFallbackReply({ tenant, message, channel }),
+        providerUsed: text ? "openai-fallback" : "local-demo-fallback",
+      };
+    } catch (openAiError) {
+      console.error(
+        "Fallback local:",
+        openAiError.response?.data || openAiError.message
+      );
+      return {
+        reply: generateLocalFallbackReply({ tenant, message, channel }),
+        providerUsed: "local-demo-fallback",
+      };
+    }
   }
 }
 
@@ -1073,6 +1357,10 @@ Instrucciones del canal:
  */
 
 async function getExistingLead(tenant, conversationId) {
+  if (tenant?.isLocalDemo || mongoose.connection.readyState !== 1) {
+    return null;
+  }
+
   return Lead.findOne({
     tenantId: tenant.apiKey,
     conversationId,
@@ -1134,6 +1422,19 @@ async function handleBusinessActions({
   interested,
   requestedDemo,
 }) {
+  if (tenant?.isLocalDemo || mongoose.connection.readyState !== 1) {
+    return {
+      leadSaved: false,
+      webhookSent: false,
+      mergedLead: {
+        name: name || null,
+        phone: phone || null,
+        interested: Boolean(interested),
+        requestedDemo: Boolean(requestedDemo),
+      },
+    };
+  }
+
   const existingLead = await getExistingLead(tenant, conversationId);
 
   const finalName = name || existingLead?.name || null;
@@ -1287,6 +1588,35 @@ app.post("/voice/speak", requireTenant, async (req, res) => {
   }
 });
 
+app.post("/voice/correct-transcript", requireTenant, async (req, res) => {
+  try {
+    const { rawTranscript = "" } = req.body;
+    const clientConfig = req.clientConfig || req.tenant?.config?.clientConfig;
+
+    if (!rawTranscript.trim()) {
+      return res.json({
+        correctedTranscript: "",
+        confidence: "low",
+        detectedIntent: "empty",
+        needsUserReview: true,
+      });
+    }
+
+    const result = await correctTranscript({
+      rawTranscript,
+      clientConfig: normalizeClientConfig(clientConfig),
+    });
+
+    return res.json(result);
+  } catch (error) {
+    console.error(
+      "Error en /voice/correct-transcript:",
+      error.response?.data || error.message
+    );
+    return res.status(500).json({ error: "Error corrigiendo transcripcion" });
+  }
+});
+
 /**
  * =========================================
  * CHAT
@@ -1297,25 +1627,46 @@ app.post("/chat", requireTenant, async (req, res) => {
   try {
     const {
       message,
-      conversationId,
+      conversationId: requestedConversationId,
+      conversationHistory = [],
       channel = "chat",
       assistantId: requestedAssistantId,
     } = req.body;
 
     const tenant = req.tenant;
+    const conversationId =
+      requestedConversationId ||
+      `client-${req.body?.clientId || tenant?.config?.clientConfig?.clientId || DEFAULT_CLIENT_ID}`;
 
     if (!message || !message.trim()) {
       return res.status(400).json({ error: "Mensaje vacío" });
     }
 
-    if (!conversationId) {
-      return res.status(400).json({ error: "Falta conversationId" });
+    if (Array.isArray(conversationHistory) && conversationHistory.length) {
+      clearConversationHistory(conversationId);
+      conversationHistory.slice(-MAX_HISTORY_MESSAGES).forEach((item) => {
+        if (!item?.content && !item?.text) return;
+        appendConversationMessage(
+          conversationId,
+          item.role === "assistant" || item.role === "bot"
+            ? "assistant"
+            : "user",
+          item.content || item.text
+        );
+      });
     }
 
     const previousAssistantId =
       requestedAssistantId && ASSISTANT_IDS.includes(requestedAssistantId)
         ? requestedAssistantId
         : getStoredAssistant(conversationId);
+    const requestClientConfig = normalizeClientConfig(
+      req.clientConfig || tenant?.config?.clientConfig || {}
+    );
+    const agentRuntimeConfig = getAgentConfig();
+    const multiAgentVoicesEnabled =
+      Boolean(requestClientConfig.features?.multiAgentVoices) &&
+      agentRuntimeConfig.multiAgentVoicesEnabled;
 
     const isOffTopic = detectOffTopicMessage(message);
 
@@ -1357,16 +1708,22 @@ app.post("/chat", requireTenant, async (req, res) => {
       });
     }
 
-    const routing = routeAssistant({
-      message,
-      currentAssistantId: previousAssistantId,
-    });
+    const routing = multiAgentVoicesEnabled
+      ? routeAssistant({
+          message,
+          currentAssistantId: previousAssistantId,
+        })
+      : {
+          intent: detectIntentBucket(message),
+          nextAssistantId: "main",
+        };
 
     const selectedAssistantId = routing.nextAssistantId;
     const previousAssistant = getAssistantConfig(previousAssistantId);
     const selectedAssistant = getAssistantConfig(selectedAssistantId);
 
-    const switched = previousAssistantId !== selectedAssistantId;
+    const switched =
+      multiAgentVoicesEnabled && previousAssistantId !== selectedAssistantId;
     const transitionText = switched
       ? buildTransitionText(previousAssistantId, selectedAssistantId)
       : "";
@@ -1375,6 +1732,8 @@ app.post("/chat", requireTenant, async (req, res) => {
     const phone = extractPhone(message);
     const interested = detectInterest(message);
     const requestedDemo = wantsDemo(message);
+    const clientConfig = requestClientConfig;
+    const leadSignal = extractLeadSignal({ message, clientConfig });
 
     const ai = await generateAIReply({
       tenant,
@@ -1383,6 +1742,7 @@ app.post("/chat", requireTenant, async (req, res) => {
       conversationId,
       channel,
       req,
+      leadSignal,
     });
 
     const rawReply = ai.reply || "Hubo un problema al generar la respuesta.";
@@ -1431,6 +1791,13 @@ app.post("/chat", requireTenant, async (req, res) => {
       detectedIntent: routing.intent,
       providerUsed: ai.providerUsed,
       clientType: detectClientType(req),
+      clientId: clientConfig.clientId,
+      publicClientConfig: getPublicClientConfigFromFull(clientConfig),
+      audio: {
+        elevenLabsActive: agentRuntimeConfig.multiAgentVoicesEnabled,
+        multiAgentVoicesEnabled,
+      },
+      leadSignal,
 
       actions,
       memorySize: getConversationHistory(conversationId).length,

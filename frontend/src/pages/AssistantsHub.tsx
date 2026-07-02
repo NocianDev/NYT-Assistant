@@ -1,12 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 import { ASSISTANTS } from "../data/assistants";
 import VoiceWidgetPanel from "../components/VoiceWidgetPanel";
+import {
+  fallbackPublicClientConfig,
+  fetchPublicClientConfig,
+} from "../config/clientConfig";
 
 export default function AssistantsHub() {
   const [selectedId, setSelectedId] = useState("isis");
   const [isMobile, setIsMobile] = useState(
     typeof window !== "undefined" ? window.innerWidth < 900 : false
   );
+  const [publicConfig, setPublicConfig] = useState(fallbackPublicClientConfig);
 
   useEffect(() => {
     function handleResize() {
@@ -17,9 +22,29 @@ export default function AssistantsHub() {
     return () => window.removeEventListener("resize", handleResize);
   }, []);
 
+  useEffect(() => {
+    fetchPublicClientConfig()
+      .then(setPublicConfig)
+      .catch((error) =>
+        console.error("No se pudo cargar configuracion publica:", error),
+      );
+  }, []);
+
+  const multiAgentVoicesEnabled =
+    publicConfig.enabledFeatures.multiAgentVoices &&
+    Boolean(publicConfig.audio?.elevenLabsActive);
+
   const selectedAssistant = useMemo(
-    () => ASSISTANTS.find((a) => a.id === selectedId) || ASSISTANTS[0],
-    [selectedId]
+    () =>
+      multiAgentVoicesEnabled
+        ? ASSISTANTS.find((a) => a.id === selectedId) || ASSISTANTS[0]
+        : {
+            id: "main",
+            name: "NYT Assistant",
+            role: "Asistente principal",
+            color: "#dc2626",
+          },
+    [multiAgentVoicesEnabled, selectedId]
   );
 
   return (
@@ -38,7 +63,7 @@ export default function AssistantsHub() {
           maxWidth: "1400px",
           margin: "0 auto",
           display: "grid",
-          gridTemplateColumns: isMobile ? "1fr" : "320px 1fr",
+          gridTemplateColumns: isMobile || !multiAgentVoicesEnabled ? "1fr" : "320px 1fr",
           gap: isMobile ? "14px" : "24px",
           alignItems: "start",
         }}
@@ -105,6 +130,7 @@ export default function AssistantsHub() {
           </div>
         </section>
 
+        {multiAgentVoicesEnabled && (
         <aside
           style={{
             order: isMobile ? 2 : 1,
@@ -220,6 +246,7 @@ export default function AssistantsHub() {
             })}
           </div>
         </aside>
+        )}
       </div>
     </main>
   );
