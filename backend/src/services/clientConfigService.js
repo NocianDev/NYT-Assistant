@@ -9,51 +9,79 @@ const DEFAULT_CLIENT_ID = process.env.DEFAULT_CLIENT_ID || "nyt-general";
 
 const cache = new Map();
 
+function normalizeArray(value) {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item) => item !== null && item !== undefined);
+}
+
+function normalizeFaqItem(item = {}) {
+  return {
+    question: item.question || item.pregunta || "",
+    answer: item.answer || item.respuesta || "",
+  };
+}
+
 function normalizeClientConfig(raw = {}) {
+  const features = {
+    voice: true,
+    leadCapture: true,
+    multiAgentVoices: false,
+    ...(raw.features || {}),
+  };
+
+  const theme = {
+    primaryColor: "#111827",
+    accentColor: "#dc2626",
+    backgroundColor: "#f8fafc",
+    ...(raw.theme || {}),
+  };
+
   return {
     clientId: raw.clientId || DEFAULT_CLIENT_ID,
     businessName: raw.businessName || "Cliente Demo NYT",
     industry: raw.industry || "Negocio",
     assistantName: raw.assistantName || "NYT Assistant",
-    tone: raw.tone || "profesional, claro y amable",
-    services: Array.isArray(raw.services) ? raw.services : [],
+    tone: raw.tone || "profesional, claro, amable y comercial",
+    publicWelcomeMessage: raw.publicWelcomeMessage || "",
+    services: normalizeArray(raw.services).map((item) => String(item).trim()).filter(Boolean),
     businessHours: raw.businessHours || "",
     location: raw.location || "",
-    appointmentTypes: Array.isArray(raw.appointmentTypes)
-      ? raw.appointmentTypes
-      : [],
-    faq: Array.isArray(raw.faq) ? raw.faq : [],
-    rules: Array.isArray(raw.rules) ? raw.rules : [],
-    leadFields: Array.isArray(raw.leadFields) ? raw.leadFields : [],
-    handoff: raw.handoff || {
+    appointmentTypes: normalizeArray(raw.appointmentTypes).map((item) => String(item).trim()).filter(Boolean),
+    faq: normalizeArray(raw.faq)
+      .map(normalizeFaqItem)
+      .filter((item) => item.question && item.answer),
+    rules: normalizeArray(raw.rules).map((item) => String(item).trim()).filter(Boolean),
+    leadFields: normalizeArray(raw.leadFields).map((item) => String(item).trim()).filter(Boolean),
+    handoff: {
       whatsapp: "",
       email: "",
       instructions: "Canalizar al equipo humano.",
+      ...(raw.handoff || {}),
     },
-    theme: raw.theme || {
-      primaryColor: "#111827",
-      accentColor: "#dc2626",
-    },
-    features: raw.features || {
-      voice: true,
-      leadCapture: true,
-      multiAgentVoices: false,
-    },
+    theme,
+    features,
   };
 }
 
+function sanitizeClientId(clientId) {
+  return String(clientId || DEFAULT_CLIENT_ID)
+    .trim()
+    .toLowerCase()
+    .replace(/_/g, "-")
+    .replace(/[^a-z0-9-]/g, "")
+    .replace(/-+/g, "-")
+    .replace(/^-|-$/g, "") || DEFAULT_CLIENT_ID;
+}
+
 async function readClientFile(clientId) {
-  const safeClientId = String(clientId || DEFAULT_CLIENT_ID).replace(
-    /[^a-z0-9-]/gi,
-    "",
-  );
+  const safeClientId = sanitizeClientId(clientId);
   const filePath = path.join(CLIENTS_DIR, `${safeClientId}.json`);
   const raw = await fs.readFile(filePath, "utf8");
   return normalizeClientConfig(JSON.parse(raw));
 }
 
 export async function getClientConfig(clientId = DEFAULT_CLIENT_ID) {
-  const normalizedId = clientId || DEFAULT_CLIENT_ID;
+  const normalizedId = sanitizeClientId(clientId || DEFAULT_CLIENT_ID);
 
   if (cache.has(normalizedId)) {
     return cache.get(normalizedId);
@@ -83,7 +111,9 @@ export function getPublicClientConfigFromFull(config) {
     businessName: normalized.businessName,
     industry: normalized.industry,
     assistantName: normalized.assistantName,
-    publicWelcomeMessage: `Soy ${normalized.assistantName}, configurado para atender a ${normalized.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`,
+    publicWelcomeMessage:
+      normalized.publicWelcomeMessage ||
+      `Soy ${normalized.assistantName}, configurado para atender a ${normalized.businessName}. Puedo ayudarte con información, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`,
     theme: normalized.theme,
     enabledFeatures: normalized.features,
   };
@@ -101,4 +131,4 @@ export async function listAvailableClients() {
     .map((file) => file.replace(/\.json$/i, ""));
 }
 
-export { DEFAULT_CLIENT_ID, normalizeClientConfig };
+export { DEFAULT_CLIENT_ID, normalizeClientConfig, sanitizeClientId };

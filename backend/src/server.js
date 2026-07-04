@@ -55,20 +55,43 @@ const allowedOrigins = [
   "http://localhost:5173",
   "http://localhost:3000",
   process.env.FRONTEND_URL,
+  ...(process.env.ALLOWED_ORIGINS || "")
+    .split(",")
+    .map((origin) => origin.trim())
+    .filter(Boolean),
 ].filter(Boolean);
+
+const allowedOriginSuffixes = (process.env.ALLOWED_ORIGIN_SUFFIXES || ".vercel.app")
+  .split(",")
+  .map((suffix) => suffix.trim().toLowerCase())
+  .filter(Boolean);
+
+function isOriginAllowed(origin = "") {
+  if (!origin) return true;
+
+  const normalizedOrigin = origin.toLowerCase();
+
+  const exactMatch = allowedOrigins.some(
+    (allowed) => allowed && normalizedOrigin === allowed.toLowerCase(),
+  );
+
+  if (exactMatch) return true;
+
+  try {
+    const host = new URL(normalizedOrigin).hostname;
+    return allowedOriginSuffixes.some((suffix) => {
+      const cleanSuffix = suffix.replace(/^https?:\/\//, "");
+      return host === cleanSuffix || host.endsWith(cleanSuffix);
+    });
+  } catch {
+    return false;
+  }
+}
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-
-      const normalizedOrigin = origin.toLowerCase();
-
-      const isAllowed = allowedOrigins.some(
-        (allowed) => allowed && normalizedOrigin === allowed.toLowerCase()
-      );
-
-      if (isAllowed) {
+      if (isOriginAllowed(origin)) {
         return callback(null, true);
       }
 
@@ -640,7 +663,9 @@ function createDemoTenant(clientConfig = {}) {
       tone: config.tone,
       clientConfig: config,
       primaryColor: "#dc2626",
-      welcomeMessage: `Soy ${config.assistantName}, configurado para atender a ${config.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`,
+      welcomeMessage:
+        config.publicWelcomeMessage ||
+        `Soy ${config.assistantName}, configurado para atender a ${config.businessName}. Puedo ayudarte con informacion, servicios, preguntas frecuentes y canalizar tu solicitud al equipo.`,
     },
     isLocalDemo: true,
   };
